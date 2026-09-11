@@ -1,7 +1,6 @@
 .venv/
 __pycache__/
 *.py[cod]
-log_analysis_agent/.env
 log_analysis_agent/artifacts/
 drivers.qat.lce.test.framework/
 copilot.exe
