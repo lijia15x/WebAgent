@@ -4,3 +4,5 @@ __pycache__/
 log_analysis_agent/.env
 log_analysis_agent/artifacts/
 drivers.qat.lce.test.framework/
+copilot.exe
+copilot-win32-x64.zip
