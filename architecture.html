@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebAgent 时序图</title>
+  <style>
+    :root {
+      --bg: #111315;
+      --panel: #1d2023;
+      --text: #d9dde1;
+      --muted: #aeb5bb;
+      --line: #287da3;
+      --message: #bbc2c7;
+      --accent: #4ba2c7;
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    * { box-sizing: border-box; }
+    body { min-width: 320px; min-height: 100vh; margin: 0; background: var(--bg); }
+    main { width: min(1500px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 38px; }
+    header { margin-bottom: 24px; }
+    h1 { margin: 0; font-size: 24px; letter-spacing: 0; }
+    header p { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
+
+    .diagram-shell { overflow-x: auto; padding: 20px; border: 1px solid #292e32; background: #121416; }
+    .diagram { position: relative; width: 1380px; height: 760px; margin: 0 auto; }
+    .participants { position: absolute; inset: 0 0 auto; display: grid; grid-template-columns: repeat(6, 1fr); gap: 52px; z-index: 3; }
+    .participants.bottom { top: auto; bottom: 0; }
+    .participant { height: 50px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 3px; background: var(--panel); font-size: 13px; }
+
+    .lifelines { position: absolute; inset: 50px 0; display: grid; grid-template-columns: repeat(6, 1fr); gap: 52px; padding: 0 1px; }
+    .lifeline { position: relative; }
+    .lifeline::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; background: var(--line); }
+
+    .message { position: absolute; z-index: 2; height: 34px; color: var(--text); font-size: 12px; }
+    .message .label { position: absolute; left: 0; right: 0; bottom: 11px; text-align: center; white-space: nowrap; }
+    .message .shaft { position: absolute; left: 0; right: 0; bottom: 6px; height: 1px; background: var(--message); }
+    .message.forward .shaft::after { content: ""; position: absolute; right: -1px; top: -4px; border-width: 4px 0 4px 8px; border-style: solid; border-color: transparent transparent transparent var(--message); }
+    .message.return .shaft { height: 0; border-top: 1px dashed var(--message); background: transparent; }
+    .message.return .shaft::before { content: ""; position: absolute; left: -1px; top: -5px; border-width: 4px 8px 4px 0; border-style: solid; border-color: transparent var(--message) transparent transparent; }
+
+    .note { position: absolute; z-index: 4; padding: 8px 11px; border: 1px solid #4c565d; background: #202428; color: var(--muted); font-size: 11px; line-height: 1.45; }
+
+    /* Participant centers: 89, 329, 569, 809, 1049, 1289 */
+    .m1 { top: 82px; left: 89px; width: 240px; }
+    .m2 { top: 126px; left: 89px; width: 240px; }
+    .m3 { top: 178px; left: 89px; width: 240px; }
+    .m4 { top: 224px; left: 329px; width: 240px; }
+    .m5 { top: 270px; left: 569px; width: 240px; }
+    .m6 { top: 316px; left: 809px; width: 240px; }
+    .m7 { top: 362px; left: 1049px; width: 240px; }
+    .m8 { top: 408px; left: 1049px; width: 240px; }
+    .m9 { top: 454px; left: 809px; width: 240px; }
+    .m10 { top: 500px; left: 569px; width: 240px; }
+    .m11 { top: 546px; left: 329px; width: 240px; }
+    .m12 { top: 592px; left: 89px; width: 240px; }
+    .note-route { top: 293px; left: 824px; }
+
+    .legend { display: flex; gap: 24px; margin-top: 16px; color: var(--muted); font-size: 11px; }
+    .legend span { display: inline-flex; align-items: center; gap: 8px; }
+    .legend i { width: 34px; border-top: 1px solid var(--message); }
+    .legend .dashed { border-top-style: dashed; }
+
+    @media (max-width: 700px) {
+      main { width: calc(100% - 16px); padding-top: 14px; }
+      header { padding: 0 6px; }
+      .diagram-shell { padding: 12px; }
+    }
+
+    @media print {
+      :root { --bg: #fff; --panel: #f5f5f5; --text: #111; --muted: #444; --message: #333; }
+      main { width: 100%; padding: 0; }
+      .diagram-shell { overflow: visible; border: 0; }
+      .diagram { transform: scale(.72); transform-origin: top left; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>WebAgent 请求时序图</h1>
+      <p>Web 提交问题，API 启动 Agent；LangGraph 选择并执行 Skill，过程与答案通过 SSE 返回。</p>
+    </header>
+
+    <section class="diagram-shell" aria-label="WebAgent 请求时序图">
+      <div class="diagram">
+        <div class="participants">
+          <div class="participant">Web</div>
+          <div class="participant">FastAPI</div>
+          <div class="participant">AgentService</div>
+          <div class="participant">LangGraph</div>
+          <div class="participant">Skill Runner</div>
+          <div class="participant">Jenkins / Copilot</div>
+        </div>
+
+        <div class="lifelines" aria-hidden="true">
+          <div class="lifeline"></div><div class="lifeline"></div><div class="lifeline"></div>
+          <div class="lifeline"></div><div class="lifeline"></div><div class="lifeline"></div>
+        </div>
+
+        <div class="message forward m1"><span class="label">POST /api/agents/{id}/messages</span><i class="shaft"></i></div>
+        <div class="message return m2"><span class="label">run_id · 202 Accepted</span><i class="shaft"></i></div>
+        <div class="message forward m3"><span class="label">GET /api/runs/{run_id}/events</span><i class="shaft"></i></div>
+        <div class="message forward m4"><span class="label">submit(question) · 启动后台任务</span><i class="shaft"></i></div>
+        <div class="message forward m5"><span class="label">graph.invoke(question)</span><i class="shaft"></i></div>
+        <div class="message forward m6"><span class="label">选择 Skill · 规划命令</span><i class="shaft"></i></div>
+        <div class="note note-route">按问题动态选择<br>jenkins_api 或 copilot_sdk</div>
+        <div class="message forward m7"><span class="label">执行 Skill 命令</span><i class="shaft"></i></div>
+        <div class="message return m8"><span class="label">日志 / 状态 / 分析结果</span><i class="shaft"></i></div>
+        <div class="message return m9"><span class="label">command result</span><i class="shaft"></i></div>
+        <div class="message return m10"><span class="label">progress · tool · answer delta</span><i class="shaft"></i></div>
+        <div class="message return m11"><span class="label">event queue → SSE</span><i class="shaft"></i></div>
+        <div class="message return m12"><span class="label">completed / error</span><i class="shaft"></i></div>
+
+        <div class="participants bottom">
+          <div class="participant">Web</div>
+          <div class="participant">FastAPI</div>
+          <div class="participant">AgentService</div>
+          <div class="participant">LangGraph</div>
+          <div class="participant">Skill Runner</div>
+          <div class="participant">Jenkins / Copilot</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="legend" aria-label="图例">
+      <span><i></i>调用</span>
+      <span><i class="dashed"></i>返回或事件</span>
+    </div>
+  </main>
+</body>
+</html>
