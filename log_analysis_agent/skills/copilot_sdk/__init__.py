@@ -1,1 +1,0 @@
-"""GitHub Copilot SDK command skill."""

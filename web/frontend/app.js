@@ -141,7 +141,7 @@ const activityList = document.querySelector("#activityList");
 const activityStatus = document.querySelector("#activityStatus");
 const languageToggle = document.querySelector("#languageToggle");
 let selectedAgent = "jenkins";
-let currentLanguage = "zh";
+let currentLanguage = "en";
 let toastTimer;
 let eventSource;
 let isRunning = false;

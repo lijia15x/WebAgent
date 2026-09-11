@@ -1,1 +1,0 @@
-"""Skills available to the supervisor agent."""

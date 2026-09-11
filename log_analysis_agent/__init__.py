@@ -1,1 +1,0 @@
-"""Jenkins log analysis agent."""
