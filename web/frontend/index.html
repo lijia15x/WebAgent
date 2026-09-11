@@ -15,74 +15,71 @@
     <aside class="agent-sidebar" id="agentSidebar">
       <header class="brand-row">
         <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
-        <div><strong>Agent Desk</strong><small>Operations workspace</small></div>
-        <button class="icon-button mobile-only" id="closeSidebar" aria-label="关闭 Agent 列表" title="关闭">×</button>
+        <div><strong>Agent Desk</strong><small data-i18n="brandSubtitle">运维工作台</small></div>
+        <button class="icon-button mobile-only" id="closeSidebar" aria-label="关闭 Agent 列表" title="关闭" data-i18n-aria="closeAgentList" data-i18n-title="close">×</button>
       </header>
-      <div class="sidebar-heading"><span>Agents</span><span class="agent-count">3</span></div>
-      <nav class="agent-list" aria-label="Agent 列表">
+      <div class="sidebar-heading"><span>Agents</span><span class="agent-count">1</span></div>
+      <nav class="agent-list" aria-label="Agent 列表" data-i18n-aria="agentList">
         <button class="agent-item is-active" data-agent="jenkins">
           <span class="agent-avatar avatar-jenkins">JL</span>
-          <span class="agent-copy"><strong>Jenkins Log Analyst</strong><small><i class="status-dot idle"></i> 空闲</small></span><span class="chevron">›</span>
+          <span class="agent-copy"><strong>Jenkins Log Analyst</strong><small><i class="status-dot idle"></i> <span data-i18n="idle">空闲</span></small></span><span class="chevron">›</span>
         </button>
-        <button class="agent-item" data-agent="release">
-          <span class="agent-avatar avatar-release">RN</span>
-          <span class="agent-copy"><strong>Release Notes</strong><small><i class="status-dot"></i> 即将推出</small></span><span class="chevron">›</span>
-        </button>
-        <button class="agent-item" data-agent="triage">
-          <span class="agent-avatar avatar-triage">BT</span>
-          <span class="agent-copy"><strong>Bug Triage</strong><small><i class="status-dot"></i> 未配置</small></span><span class="chevron">›</span>
-        </button>
+        <div class="agent-item agent-placeholder" aria-disabled="true">
+          <span class="agent-avatar avatar-more">＋</span>
+          <span class="agent-copy"><strong data-i18n="moreAgents">更多 Agent</strong><small><i class="status-dot"></i> <span data-i18n="comingSoon">即将推出</span></small></span>
+        </div>
       </nav>
       <div class="sidebar-footer">
-        <div class="connection-row"><span class="pulse-dot"></span><div><strong>Services online</strong><small>Ollama · Jenkins · Copilot</small></div></div>
-        <button class="sidebar-action" id="settingsButton"><span aria-hidden="true">⚙</span> Settings</button>
+        <div class="connection-row"><span class="pulse-dot"></span><div><strong data-i18n="servicesOnline">服务在线</strong><small>Ollama · Jenkins · Copilot</small></div></div>
+        <button class="sidebar-action" id="settingsButton"><span aria-hidden="true">⚙</span> <span data-i18n="settings">设置</span></button>
       </div>
     </aside>
 
     <main class="chat-workspace">
       <header class="chat-header">
-        <button class="icon-button mobile-only" id="openSidebar" aria-label="打开 Agent 列表" title="Agents">☰</button>
+        <button class="icon-button mobile-only" id="openSidebar" aria-label="打开 Agent 列表" title="Agents" data-i18n-aria="openAgentList">☰</button>
         <div class="current-agent">
           <span class="agent-avatar avatar-jenkins" id="headerAvatar">JL</span>
           <div>
             <div class="title-line"><h1 id="agentTitle">Jenkins Log Analyst</h1><span class="status-pill" id="agentStatus">Ready</span></div>
-            <p id="agentDescription">定位构建失败原因，并结合 Workspace 源码给出修复建议</p>
+            <p id="agentDescription" data-i18n="agentDescription">定位构建失败原因，并结合 Workspace 源码给出修复建议</p>
           </div>
         </div>
         <div class="header-actions">
-          <button class="text-button" id="clearButton"><span aria-hidden="true">↺</span><b>新会话</b></button>
-          <button class="icon-button" id="activityToggle" aria-label="显示执行轨迹" title="执行轨迹">≡</button>
+          <button class="language-button" id="languageToggle" type="button" aria-label="Switch to English" title="Switch to English"><span class="language-current">中</span><span class="language-separator">/</span><span class="language-next">EN</span></button>
+          <button class="text-button" id="clearButton"><span aria-hidden="true">↺</span><b data-i18n="newSession">新会话</b></button>
+          <button class="icon-button" id="activityToggle" aria-label="显示执行轨迹" title="执行轨迹" data-i18n-aria="showActivity" data-i18n-title="activityTitle">≡</button>
         </div>
       </header>
 
       <section class="run-strip is-hidden" id="runStrip" aria-live="polite">
-        <div class="run-summary"><span class="run-indicator"><i></i></span><div><strong id="runTitle">正在准备任务</strong><small id="runMeta">等待 Agent 响应</small></div></div>
-        <div class="run-stages" aria-label="Agent 执行阶段"><span>Route</span><b></b><span>Jenkins</span><b></b><span>Copilot</span><b></b><span>Answer</span></div>
-        <button class="icon-button strip-close" id="stripClose" aria-label="收起状态栏" title="收起">×</button>
+        <div class="run-summary"><span class="run-indicator"><i></i></span><div><strong id="runTitle" data-i18n="preparingTask">正在准备任务</strong><small id="runMeta" data-i18n="waitingAgent">等待 Agent 响应</small></div></div>
+        <div class="run-stages" aria-label="Agent 执行阶段" data-i18n-aria="agentStages"><span>Route</span><b></b><span>Jenkins</span><b></b><span>Copilot</span><b></b><span>Answer</span></div>
+        <button class="icon-button strip-close" id="stripClose" aria-label="收起状态栏" title="收起" data-i18n-aria="collapseStatus" data-i18n-title="collapse">×</button>
       </section>
 
       <div class="content-grid">
         <section class="conversation" id="conversation" aria-live="polite">
           <div class="empty-state" id="emptyState">
             <span class="empty-mark">JL</span>
-            <h2>从一次构建开始</h2>
-            <p>粘贴 Jenkins Job 或 Build 链接。Agent 会获取日志、定位相关源码并给出可验证的根因分析。</p>
+            <h2 data-i18n="emptyTitle">从一次构建开始</h2>
+            <p data-i18n="emptyDescription">粘贴 Jenkins Job 或 Build 链接。Agent 会获取日志、定位相关源码并给出可验证的根因分析。</p>
           </div>
         </section>
 
         <aside class="activity-panel" id="activityPanel">
-          <header><div><span class="eyebrow">Execution</span><h2>执行轨迹</h2></div><button class="icon-button" id="closeActivity" aria-label="关闭执行轨迹" title="关闭">×</button></header>
-          <div class="activity-list" id="activityList"><p class="activity-empty">任务开始后将在这里显示实时轨迹。</p></div>
-          <div class="activity-footer"><span>状态</span><strong id="activityStatus">Ready</strong></div>
+          <header><div><span class="eyebrow">Execution</span><h2 data-i18n="activityTitle">执行轨迹</h2></div><button class="icon-button" id="closeActivity" aria-label="关闭执行轨迹" title="关闭" data-i18n-aria="closeActivity" data-i18n-title="close">×</button></header>
+          <div class="activity-list" id="activityList"><p class="activity-empty" data-i18n="activityEmpty">任务开始后将在这里显示实时轨迹。</p></div>
+          <div class="activity-footer"><span data-i18n="status">状态</span><strong id="activityStatus">Ready</strong></div>
         </aside>
       </div>
 
       <footer class="composer-wrap">
         <form class="composer" id="messageForm">
-          <textarea id="messageInput" rows="1" placeholder="输入 Jenkins 链接或描述问题…" aria-label="消息"></textarea>
-          <div class="composer-footer"><div class="composer-tools"><button type="button" class="icon-button" aria-label="添加附件" title="添加附件">＋</button><span>Enter 发送 · Shift + Enter 换行</span></div><button class="send-button" id="sendButton" type="submit"><span>发送</span><span aria-hidden="true">↑</span></button></div>
+          <textarea id="messageInput" rows="1" placeholder="输入 Jenkins 链接或描述问题…" aria-label="消息" data-i18n-placeholder="messagePlaceholder" data-i18n-aria="message"></textarea>
+          <div class="composer-footer"><div class="composer-tools"><button type="button" class="icon-button" aria-label="添加附件" title="添加附件" data-i18n-aria="addAttachment" data-i18n-title="addAttachment">＋</button><span data-i18n="composerHint">Enter 发送 · Shift + Enter 换行</span></div><button class="send-button" id="sendButton" type="submit"><span data-i18n="send">发送</span><span aria-hidden="true">↑</span></button></div>
         </form>
-        <p class="disclaimer">Agent 输出可能包含错误，请在执行修复前验证关键结论。</p>
+        <p class="disclaimer" data-i18n="disclaimer">Agent 输出可能包含错误，请在执行修复前验证关键结论。</p>
       </footer>
     </main>
   </div>
