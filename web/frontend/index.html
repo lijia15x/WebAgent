@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1d2420">
+  <title>Agent Desk</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="agent-sidebar" id="agentSidebar">
+      <header class="brand-row">
+        <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div><strong>Agent Desk</strong><small>Operations workspace</small></div>
+        <button class="icon-button mobile-only" id="closeSidebar" aria-label="关闭 Agent 列表" title="关闭">×</button>
+      </header>
+      <div class="sidebar-heading"><span>Agents</span><span class="agent-count">3</span></div>
+      <nav class="agent-list" aria-label="Agent 列表">
+        <button class="agent-item is-active" data-agent="jenkins">
+          <span class="agent-avatar avatar-jenkins">JL</span>
+          <span class="agent-copy"><strong>Jenkins Log Analyst</strong><small><i class="status-dot idle"></i> 空闲</small></span><span class="chevron">›</span>
+        </button>
+        <button class="agent-item" data-agent="release">
+          <span class="agent-avatar avatar-release">RN</span>
+          <span class="agent-copy"><strong>Release Notes</strong><small><i class="status-dot"></i> 即将推出</small></span><span class="chevron">›</span>
+        </button>
+        <button class="agent-item" data-agent="triage">
+          <span class="agent-avatar avatar-triage">BT</span>
+          <span class="agent-copy"><strong>Bug Triage</strong><small><i class="status-dot"></i> 未配置</small></span><span class="chevron">›</span>
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="connection-row"><span class="pulse-dot"></span><div><strong>Services online</strong><small>Ollama · Jenkins · Copilot</small></div></div>
+        <button class="sidebar-action" id="settingsButton"><span aria-hidden="true">⚙</span> Settings</button>
+      </div>
+    </aside>
+
+    <main class="chat-workspace">
+      <header class="chat-header">
+        <button class="icon-button mobile-only" id="openSidebar" aria-label="打开 Agent 列表" title="Agents">☰</button>
+        <div class="current-agent">
+          <span class="agent-avatar avatar-jenkins" id="headerAvatar">JL</span>
+          <div>
+            <div class="title-line"><h1 id="agentTitle">Jenkins Log Analyst</h1><span class="status-pill" id="agentStatus">Ready</span></div>
+            <p id="agentDescription">定位构建失败原因，并结合 Workspace 源码给出修复建议</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="text-button" id="clearButton"><span aria-hidden="true">↺</span><b>新会话</b></button>
+          <button class="icon-button" id="activityToggle" aria-label="显示执行轨迹" title="执行轨迹">≡</button>
+        </div>
+      </header>
+
+      <section class="run-strip is-hidden" id="runStrip" aria-live="polite">
+        <div class="run-summary"><span class="run-indicator"><i></i></span><div><strong id="runTitle">正在准备任务</strong><small id="runMeta">等待 Agent 响应</small></div></div>
+        <div class="run-stages" aria-label="Agent 执行阶段"><span>Route</span><b></b><span>Jenkins</span><b></b><span>Copilot</span><b></b><span>Answer</span></div>
+        <button class="icon-button strip-close" id="stripClose" aria-label="收起状态栏" title="收起">×</button>
+      </section>
+
+      <div class="content-grid">
+        <section class="conversation" id="conversation" aria-live="polite">
+          <div class="empty-state" id="emptyState">
+            <span class="empty-mark">JL</span>
+            <h2>从一次构建开始</h2>
+            <p>粘贴 Jenkins Job 或 Build 链接。Agent 会获取日志、定位相关源码并给出可验证的根因分析。</p>
+          </div>
+        </section>
+
+        <aside class="activity-panel" id="activityPanel">
+          <header><div><span class="eyebrow">Execution</span><h2>执行轨迹</h2></div><button class="icon-button" id="closeActivity" aria-label="关闭执行轨迹" title="关闭">×</button></header>
+          <div class="activity-list" id="activityList"><p class="activity-empty">任务开始后将在这里显示实时轨迹。</p></div>
+          <div class="activity-footer"><span>状态</span><strong id="activityStatus">Ready</strong></div>
+        </aside>
+      </div>
+
+      <footer class="composer-wrap">
+        <form class="composer" id="messageForm">
+          <textarea id="messageInput" rows="1" placeholder="输入 Jenkins 链接或描述问题…" aria-label="消息"></textarea>
+          <div class="composer-footer"><div class="composer-tools"><button type="button" class="icon-button" aria-label="添加附件" title="添加附件">＋</button><span>Enter 发送 · Shift + Enter 换行</span></div><button class="send-button" id="sendButton" type="submit"><span>发送</span><span aria-hidden="true">↑</span></button></div>
+        </form>
+        <p class="disclaimer">Agent 输出可能包含错误，请在执行修复前验证关键结论。</p>
+      </footer>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+  <script src="./app.js"></script>
+</body>
+</html>

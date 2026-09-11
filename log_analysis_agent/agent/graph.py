@@ -13,9 +13,20 @@ MAX_COMMAND_ROUNDS = 6
 MAX_SKILL_SWITCHES = 4
 
 
-def create_agent_graph(model, command_runner: Callable = execute_command):
+def create_agent_graph(
+    model,
+    command_runner: Callable = execute_command,
+    on_event: Callable[[dict], None] | None = None,
+):
+    def emit(event: dict) -> None:
+        if on_event is not None:
+            on_event(event)
+
     def progress(message: str) -> None:
-        print(f"  [Progress] {message}", flush=True)
+        if on_event is None:
+            print(f"  [Progress] {message}", flush=True)
+        else:
+            emit({"type": "progress", "message": message})
 
     def intake(state: AgentState):
         question = state.get("original_question", "").strip()
@@ -46,6 +57,13 @@ def create_agent_graph(model, command_runner: Callable = execute_command):
 
         progress(
             f"Selected skill: {decision.skill_name}, working task: {decision.task}"
+        )
+        emit(
+            {
+                "type": "skill_selected",
+                "skill": decision.skill_name,
+                "task": decision.task,
+            }
         )
         return {
             "selected_skill": decision.skill_name,
@@ -121,9 +139,22 @@ def create_agent_graph(model, command_runner: Callable = execute_command):
         plan = state["plan"]
         command = plan["command"]
         progress(f"Executing command: {command}")
+        emit(
+            {
+                "type": "command_started",
+                "skill": state["selected_skill"],
+            }
+        )
         result = command_runner(command)
         if not (result.success and result.output.get("streamed")):
             progress(f"Command execution {'succeeded' if result.success else 'failed'}")
+        emit(
+            {
+                "type": "command_completed",
+                "skill": state["selected_skill"],
+                "success": result.success,
+            }
+        )
         return {
             "command_results": [
                 *state.get("command_results", []),
