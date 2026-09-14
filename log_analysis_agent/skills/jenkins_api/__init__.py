@@ -1,1 +1,0 @@
-"""Jenkins API command scripts."""

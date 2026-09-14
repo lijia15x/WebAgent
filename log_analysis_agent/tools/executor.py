@@ -3,7 +3,9 @@ import re
 import shlex
 import subprocess
 import sys
+import threading
 from pathlib import Path
+from typing import Callable
 
 from ..skills.contracts import CommandResult
 
@@ -35,22 +37,80 @@ def validate_command(command: str) -> None:
     parse_command(command)
 
 
-def execute_command(command: str) -> CommandResult:
+def _execute_streaming_command(
+    arguments: list[str],
+    on_event: Callable[[dict], None] | None,
+) -> subprocess.CompletedProcess:
+    process = subprocess.Popen(
+        arguments,
+        cwd=PROJECT_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    stderr_lines: list[str] = []
+
+    def read_events() -> None:
+        if process.stderr is None:
+            return
+        for line in process.stderr:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                stderr_lines.append(line)
+                continue
+            if isinstance(event, dict) and on_event is not None:
+                on_event(event)
+
+    reader = threading.Thread(target=read_events, daemon=True)
+    reader.start()
+    try:
+        process.wait(timeout=COMMAND_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+        raise CommandExecutionError(
+            f"Command timed out after {COMMAND_TIMEOUT_SECONDS} seconds"
+        )
+    finally:
+        reader.join(timeout=2)
+
+    stdout = process.stdout.read() if process.stdout is not None else ""
+    return subprocess.CompletedProcess(
+        arguments,
+        process.returncode,
+        stdout,
+        "\n".join(stderr_lines),
+    )
+
+
+def execute_command(
+    command: str,
+    on_event: Callable[[dict], None] | None = None,
+) -> CommandResult:
     try:
         arguments = parse_command(command)
         stream_copilot = (
             arguments[2]
             == "log_analysis_agent.skills.copilot_sdk.run_copilot"
         )
-        completed = subprocess.run(
-            arguments,
-            cwd=PROJECT_ROOT,
-            stdout=subprocess.PIPE,
-            stderr=None if stream_copilot else subprocess.PIPE,
-            text=True,
-            timeout=COMMAND_TIMEOUT_SECONDS,
-            check=False,
-        )
+        if stream_copilot:
+            completed = _execute_streaming_command(arguments, on_event)
+        else:
+            completed = subprocess.run(
+                arguments,
+                cwd=PROJECT_ROOT,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=COMMAND_TIMEOUT_SECONDS,
+                check=False,
+            )
         if completed.returncode != 0:
             error = (
                 completed.stderr.strip()

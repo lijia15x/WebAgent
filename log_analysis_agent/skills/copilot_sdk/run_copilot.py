@@ -19,17 +19,18 @@ def main() -> int:
 
     stream_started = False
 
+    def emit_event(event: dict) -> None:
+        print(json.dumps(event), file=sys.stderr, flush=True)
+
     def stream_delta(delta: str) -> None:
         nonlocal stream_started
         if not delta:
             return
-        if not stream_started:
-            print("Assistant: ", end="", file=sys.stderr, flush=True)
-            stream_started = True
-        print(delta, end="", file=sys.stderr, flush=True)
+        stream_started = True
+        emit_event({"type": "answer_delta", "content": delta})
 
     def stream_activity(activity: str) -> None:
-        print(f"\n[Copilot] {activity}", file=sys.stderr, flush=True)
+        emit_event({"type": "copilot_activity", "message": activity})
 
     try:
         response = asyncio.run(
@@ -44,13 +45,12 @@ def main() -> int:
             )
         )
     except Exception as exc:
-        print(str(exc), file=sys.stderr)
+        emit_event({"type": "error", "message": str(exc)})
         return 1
 
-    if stream_started:
-        print(file=sys.stderr, flush=True)
-    else:
-        print(f"Assistant: {response}", file=sys.stderr, flush=True)
+    if not stream_started:
+        emit_event({"type": "answer_delta", "content": response})
+    emit_event({"type": "answer_complete"})
     print(json.dumps({"response": response, "streamed": True}))
     return 0
 

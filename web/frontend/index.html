@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1d2420">
+  <title>Agent Desk</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="agent-sidebar" id="agentSidebar">
+      <header class="brand-row">
+        <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div><strong>Agent Desk</strong><small data-i18n="brandSubtitle">Operations workspace</small></div>
+        <button class="icon-button mobile-only" id="closeSidebar" aria-label="Close agent list" title="Close" data-i18n-aria="closeAgentList" data-i18n-title="close">×</button>
+      </header>
+      <div class="sidebar-heading"><span>Agents</span><span class="agent-count">1</span></div>
+      <nav class="agent-list" aria-label="Agent list" data-i18n-aria="agentList">
+        <button class="agent-item is-active" data-agent="jenkins">
+          <span class="agent-avatar avatar-jenkins">JL</span>
+          <span class="agent-copy"><strong>Jenkins Log Analyst</strong><small><i class="status-dot idle"></i> <span data-i18n="idle">Idle</span></small></span><span class="chevron">›</span>
+        </button>
+        <div class="agent-item agent-placeholder" aria-disabled="true">
+          <span class="agent-avatar avatar-more">＋</span>
+          <span class="agent-copy"><strong data-i18n="moreAgents">More agents</strong><small><i class="status-dot"></i> <span data-i18n="comingSoon">Coming soon</span></small></span>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="connection-row"><span class="pulse-dot"></span><div><strong data-i18n="servicesOnline">Services online</strong><small>Ollama · Jenkins · Copilot</small></div></div>
+        <button class="sidebar-action" id="settingsButton"><span aria-hidden="true">⚙</span> <span data-i18n="settings">Settings</span></button>
+      </div>
+    </aside>
+
+    <main class="chat-workspace">
+      <header class="chat-header">
+        <button class="icon-button mobile-only" id="openSidebar" aria-label="Open agent list" title="Agents" data-i18n-aria="openAgentList">☰</button>
+        <div class="current-agent">
+          <span class="agent-avatar avatar-jenkins" id="headerAvatar">JL</span>
+          <div>
+            <div class="title-line"><h1 id="agentTitle">Jenkins Log Analyst</h1><span class="status-pill" id="agentStatus">Ready</span></div>
+            <p id="agentDescription" data-i18n="agentDescription">Find build failures and verify root causes against workspace source code</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="language-button" id="languageToggle" type="button" aria-label="切换到中文" title="切换到中文"><span class="language-current">EN</span><span class="language-separator">/</span><span class="language-next">中</span></button>
+          <button class="text-button" id="clearButton"><span aria-hidden="true">↺</span><b data-i18n="newSession">New session</b></button>
+          <button class="icon-button" id="activityToggle" aria-label="Show execution activity" title="Execution activity" data-i18n-aria="showActivity" data-i18n-title="activityTitle">≡</button>
+        </div>
+      </header>
+
+      <section class="run-strip is-hidden" id="runStrip" aria-live="polite">
+        <div class="run-summary"><span class="run-indicator"><i></i></span><div><strong id="runTitle" data-i18n="preparingTask">Preparing task</strong><small id="runMeta" data-i18n="waitingAgent">Waiting for the agent</small></div></div>
+        <div class="run-stages" aria-label="Agent execution stages" data-i18n-aria="agentStages"><span>Route</span><b></b><span>Jenkins</span><b></b><span>Copilot</span><b></b><span>Answer</span></div>
+        <button class="icon-button strip-close" id="stripClose" aria-label="Collapse status bar" title="Collapse" data-i18n-aria="collapseStatus" data-i18n-title="collapse">×</button>
+      </section>
+
+      <div class="content-grid">
+        <section class="conversation" id="conversation" aria-live="polite">
+          <div class="empty-state" id="emptyState">
+            <span class="empty-mark">JL</span>
+            <h2 data-i18n="emptyTitle">Start with a build</h2>
+            <p data-i18n="emptyDescription">Paste a Jenkins job or build link. The agent will retrieve logs, inspect relevant source code, and provide a verifiable root-cause analysis.</p>
+          </div>
+        </section>
+
+        <aside class="activity-panel" id="activityPanel">
+          <header><div><span class="eyebrow">Execution</span><h2 data-i18n="activityTitle">Execution activity</h2></div><button class="icon-button" id="closeActivity" aria-label="Close execution activity" title="Close" data-i18n-aria="closeActivity" data-i18n-title="close">×</button></header>
+          <div class="activity-list" id="activityList"><p class="activity-empty" data-i18n="activityEmpty">Live execution activity will appear here after a task starts.</p></div>
+          <div class="activity-footer"><span data-i18n="status">Status</span><strong id="activityStatus">Ready</strong></div>
+        </aside>
+      </div>
+
+      <footer class="composer-wrap">
+        <form class="composer" id="messageForm">
+          <textarea id="messageInput" rows="1" placeholder="Enter a Jenkins link or describe the issue…" aria-label="Message" data-i18n-placeholder="messagePlaceholder" data-i18n-aria="message"></textarea>
+          <div class="composer-footer"><div class="composer-tools"><button type="button" class="icon-button" aria-label="Add attachment" title="Add attachment" data-i18n-aria="addAttachment" data-i18n-title="addAttachment">＋</button><span data-i18n="composerHint">Enter to send · Shift + Enter for a new line</span></div><button class="send-button" id="sendButton" type="submit"><span data-i18n="send">Send</span><span aria-hidden="true">↑</span></button></div>
+        </form>
+        <p class="disclaimer" data-i18n="disclaimer">Agent output may be inaccurate. Verify critical conclusions before applying fixes.</p>
+      </footer>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+  <script src="./app.js"></script>
+</body>
+</html>

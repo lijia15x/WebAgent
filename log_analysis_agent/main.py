@@ -10,9 +10,11 @@ load_dotenv(Path(__file__).resolve().parent / ".env")
 
 if __package__:
     from .agent.graph import create_agent_graph
+    from .tools.executor import execute_command
 else:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from log_analysis_agent.agent.graph import create_agent_graph
+    from log_analysis_agent.tools.executor import execute_command
 
 
 def create_model():
@@ -24,7 +26,29 @@ def create_model():
 
 
 def main() -> None:
-    agent = create_agent_graph(create_model())
+    stream_started = False
+
+    def print_event(event: dict) -> None:
+        nonlocal stream_started
+        event_type = event.get("type")
+        if event_type == "answer_delta":
+            if not stream_started:
+                print("Assistant: ", end="", flush=True)
+                stream_started = True
+            print(event.get("content", ""), end="", flush=True)
+        elif event_type == "answer_complete" and stream_started:
+            print(flush=True)
+            stream_started = False
+        elif event_type == "copilot_activity":
+            print(f"\n[Copilot] {event.get('message', '')}", flush=True)
+
+    agent = create_agent_graph(
+        create_model(),
+        command_runner=lambda command: execute_command(
+            command,
+            on_event=print_event,
+        ),
+    )
     print("Hi, I am jenkins log analyzer. Please input Jenkins job/build link, or input exit/quit to exit.")
     while True:
         user_input = input("You: ").strip()
