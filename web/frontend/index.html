@@ -18,11 +18,15 @@
         <div><strong>Agent Desk</strong><small data-i18n="brandSubtitle">Operations workspace</small></div>
         <button class="icon-button mobile-only" id="closeSidebar" aria-label="Close agent list" title="Close" data-i18n-aria="closeAgentList" data-i18n-title="close">×</button>
       </header>
-      <div class="sidebar-heading"><span>Agents</span><span class="agent-count">1</span></div>
+      <div class="sidebar-heading"><span>Agents</span><span class="agent-count">2</span></div>
       <nav class="agent-list" aria-label="Agent list" data-i18n-aria="agentList">
         <button class="agent-item is-active" data-agent="jenkins">
           <span class="agent-avatar avatar-jenkins">JL</span>
           <span class="agent-copy"><strong>Jenkins Log Analyst</strong><small><i class="status-dot idle"></i> <span data-i18n="idle">Idle</span></small></span><span class="chevron">›</span>
+        </button>
+        <button class="agent-item" data-agent="mrc">
+          <span class="agent-avatar avatar-mrc">MA</span>
+          <span class="agent-copy"><strong>MRC Automation</strong><small><i class="status-dot idle"></i> <span data-i18n="previewReady">Preview ready</span></small></span><span class="chevron">›</span>
         </button>
         <div class="agent-item agent-placeholder" aria-disabled="true">
           <span class="agent-avatar avatar-more">＋</span>
@@ -74,7 +78,64 @@
         </aside>
       </div>
 
-      <footer class="composer-wrap">
+      <section class="mrc-workspace is-hidden" id="mrcWorkspace" aria-label="MRC Automation preview">
+        <div class="mrc-toolbar">
+          <div>
+            <span class="eyebrow" data-i18n="mrcCycle">Reporting cycle</span>
+            <div class="week-picker"><button class="icon-button" type="button" id="previousWeek" aria-label="Previous week">‹</button><strong id="targetWeek">2026WW15</strong><button class="icon-button" type="button" id="nextWeek" aria-label="Next week">›</button></div>
+          </div>
+          <div class="preview-badge"><i></i><span data-i18n="staticPreview">Draft mode · no email will be sent</span></div>
+          <button class="automation-button" type="button" id="automationToggle" aria-pressed="false"><span class="automation-indicator" aria-hidden="true"></span><span data-i18n="enableAutomation">Enable automation</span></button>
+          <button class="sync-button" type="button" id="scanPreview"><span aria-hidden="true">↻</span><span data-i18n="scanSharePoint">Scan SharePoint</span></button>
+        </div>
+
+        <div class="mrc-scroll">
+          <section class="mrc-overview" aria-label="MRC summary">
+            <article class="metric"><span data-i18n="excelFiles">Excel files</span><strong id="fileCount">2</strong><small id="workbookNames">Execution_MRC_WW15.xlsx · Platform_MRC_WW15.xlsx</small></article>
+            <article class="metric"><span data-i18n="projectOwners">Project owners</span><strong id="ownerCount">8</strong><small data-i18n="individualDrafts">One individual draft per owner</small></article>
+            <article class="metric attention"><span data-i18n="missingUpdates">Missing updates</span><strong id="missingCount">3</strong><small data-i18n="mondayRecipients">Monday reminder recipients</small></article>
+          </section>
+
+          <section class="schedule-band" aria-label="Reminder schedule">
+            <div class="schedule-title"><span class="eyebrow" data-i18n="schedule">Schedule</span><strong data-i18n="targetNextWeek">Target: next reporting week</strong></div>
+            <div class="schedule-step is-active"><b>Tue</b><span data-i18n="allOwners">All owners</span><small data-i18n="firstReminder">First reminder</small></div>
+            <div class="schedule-line"></div>
+            <div class="schedule-step"><b>Thu</b><span data-i18n="allOwners">All owners</span><small data-i18n="secondReminder">Second reminder</small></div>
+            <div class="schedule-line"></div>
+            <div class="schedule-step warning"><b>Mon</b><span data-i18n="missingOnly">Missing only</span><small data-i18n="finalReminder">Final reminder</small></div>
+          </section>
+
+          <div class="mrc-main-grid">
+            <section class="draft-panel">
+              <header class="panel-heading"><div><span class="eyebrow" data-i18n="recipients">Recipients</span><h2 data-i18n="draftQueue">Draft queue</h2></div><span class="queue-count"><b id="draftCount">3</b> <span data-i18n="drafts">drafts</span></span></header>
+              <div class="draft-list" id="draftList">
+                <button class="draft-row is-selected" type="button" data-draft="0"><span class="owner-mark">AK</span><span><strong>alex.kim@example.com</strong><small>Core Platform · Atlas Migration</small></span><b>2</b></button>
+                <button class="draft-row" type="button" data-draft="1"><span class="owner-mark">MS</span><span><strong>maya.singh@example.com</strong><small>Data Systems · Metrics Hub</small></span><b>1</b></button>
+                <button class="draft-row" type="button" data-draft="2"><span class="owner-mark">JL</span><span><strong>jordan.lee@example.com</strong><small>Validation · Falcon CI</small></span><b>1</b></button>
+              </div>
+              <div class="data-note"><span>!</span><p><strong data-i18n="dataQuality">Data quality</strong><small data-i18n="dataQualityDetail">1 row skipped: missing owner email. Duplicate project rows were merged.</small></p></div>
+            </section>
+
+            <section class="email-panel">
+              <header class="panel-heading"><div><span class="eyebrow" data-i18n="emailPreview">Email preview</span><h2 id="previewRecipient">alex.kim@example.com</h2></div><button class="quiet-button" type="button" id="openTemplate" data-i18n="openTemplate">Open template</button></header>
+              <div class="email-meta"><span data-i18n="subject">Subject</span><strong id="emailSubject">Action required: update project status for 2026WW15</strong></div>
+              <div class="email-canvas" id="emailCanvas">
+                <div class="email-banner"><small>Project status reminder</small><strong>Please update the project status.</strong></div>
+                <div class="email-content">
+                  <p>Hi, <strong id="previewOwner">Alex</strong></p>
+                  <p>You are receiving this email because one or more projects assigned to you require a status update.</p>
+                  <table><thead><tr><th>Function team</th><th>Project</th><th>Status comments</th></tr></thead><tbody id="previewProjects"><tr><td>Core Platform</td><td>Atlas Migration</td><td><span class="missing-pill">Missing</span></td></tr><tr><td>Core Platform</td><td>Runtime Refresh</td><td><span class="missing-pill">Missing</span></td></tr></tbody></table>
+                  <p>Please update the status in <a href="#" id="workbookLink">Execution_MRC_WW15.xlsx</a> so that the project status review can be generated.</p>
+                  <a class="email-cta" href="#">Go to update</a>
+                </div>
+                <div class="email-footer">This is an automated reminder from MRC AI Automation.</div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <footer class="composer-wrap" id="composerWrap">
         <form class="composer" id="messageForm">
           <textarea id="messageInput" rows="1" placeholder="Enter a Jenkins link or describe the issue…" aria-label="Message" data-i18n-placeholder="messagePlaceholder" data-i18n-aria="message"></textarea>
           <div class="composer-footer"><div class="composer-tools"><button type="button" class="icon-button" aria-label="Add attachment" title="Add attachment" data-i18n-aria="addAttachment" data-i18n-title="addAttachment">＋</button><span data-i18n="composerHint">Enter to send · Shift + Enter for a new line</span></div><button class="send-button" id="sendButton" type="submit"><span data-i18n="send">Send</span><span aria-hidden="true">↑</span></button></div>
@@ -83,6 +144,10 @@
       </footer>
     </main>
   </div>
+  <dialog class="email-dialog" id="emailDialog">
+    <header><strong data-i18n="emailPreview">Email preview</strong><button class="icon-button" type="button" id="closeEmailDialog" aria-label="Close" data-i18n-aria="close">×</button></header>
+    <div class="email-dialog-body" id="emailDialogBody"></div>
+  </dialog>
   <div class="toast" id="toast" role="status"></div>
   <script src="./app.js"></script>
 </body>

@@ -1,5 +1,6 @@
 const agents = {
-  jenkins: { initials: "JL", title: "Jenkins Log Analyst", avatar: "avatar-jenkins", ready: true },
+  jenkins: { initials: "JL", title: "Jenkins Log Analyst", avatar: "avatar-jenkins", ready: true, descriptionKey: "agentDescription" },
+  mrc: { initials: "MA", title: "MRC Automation", avatar: "avatar-mrc", ready: true, descriptionKey: "mrcDescription" },
 };
 
 const translations = {
@@ -10,12 +11,14 @@ const translations = {
     close: "关闭",
     agentList: "Agent 列表",
     idle: "空闲",
+    previewReady: "预览就绪",
     moreAgents: "更多 Agent",
     comingSoon: "即将推出",
     servicesOnline: "服务在线",
     settings: "设置",
     openAgentList: "打开 Agent 列表",
     agentDescription: "定位构建失败原因，并结合 Workspace 源码给出修复建议",
+    mrcDescription: "扫描每周 MRC Excel，识别缺失更新并生成逐人邮件草稿",
     newSession: "新会话",
     showActivity: "显示执行轨迹",
     activityTitle: "执行轨迹",
@@ -65,6 +68,40 @@ const translations = {
     requestFailed: "Agent 请求失败",
     cannotConnect: "无法连接 Agent 服务。",
     live: "实时",
+    mrcCycle: "报告周期",
+    staticPreview: "草稿模式 · 不会发送邮件",
+    enableAutomation: "开启自动化",
+    automationOn: "自动化已开启",
+    automationEnabledPreview: "自动化已开启，手动操作已禁用",
+    automationDisabledPreview: "自动化已关闭，手动操作已恢复",
+    automationUpdateFailed: "无法更新自动化设置",
+    scanningSharePoint: "正在扫描 SharePoint…",
+    scanStarted: "MRC 扫描已启动",
+    scanCompleted: "MRC 扫描已完成并保存",
+    noSavedScan: "该报告周期还没有已保存的扫描",
+    snapshotLoadFailed: "无法加载已保存的扫描",
+    scanSharePoint: "扫描 SharePoint",
+    excelFiles: "Excel 文件",
+    projectOwners: "项目负责人",
+    individualDrafts: "每位负责人一封独立草稿",
+    missingUpdates: "缺失更新",
+    mondayRecipients: "周一提醒收件人",
+    schedule: "提醒计划",
+    targetNextWeek: "目标：下一报告周",
+    allOwners: "全部负责人",
+    firstReminder: "首次提醒",
+    secondReminder: "再次提醒",
+    missingOnly: "仅未填写者",
+    finalReminder: "最终提醒",
+    recipients: "收件人",
+    draftQueue: "草稿队列",
+    drafts: "封草稿",
+    dataQuality: "数据质量",
+    dataQualityDetail: "跳过 1 行：负责人邮箱缺失。重复项目行已合并。",
+    emailPreview: "邮件预览",
+    openTemplate: "打开模板",
+    subject: "主题",
+    previewScanComplete: "静态扫描预览已更新",
   },
   en: {
     pageTitle: "Agent Desk",
@@ -73,12 +110,14 @@ const translations = {
     close: "Close",
     agentList: "Agent list",
     idle: "Idle",
+    previewReady: "Preview ready",
     moreAgents: "More agents",
     comingSoon: "Coming soon",
     servicesOnline: "Services online",
     settings: "Settings",
     openAgentList: "Open agent list",
     agentDescription: "Find build failures and verify root causes against workspace source code",
+    mrcDescription: "Scan weekly MRC workbooks, find missing updates, and prepare individual email drafts",
     newSession: "New session",
     showActivity: "Show execution activity",
     activityTitle: "Execution activity",
@@ -128,6 +167,40 @@ const translations = {
     requestFailed: "Agent request failed",
     cannotConnect: "Unable to connect to the agent service.",
     live: "live",
+    mrcCycle: "Reporting cycle",
+    staticPreview: "Draft mode · no email will be sent",
+    enableAutomation: "Enable automation",
+    automationOn: "Automation on",
+    automationEnabledPreview: "Automation enabled; manual controls are disabled",
+    automationDisabledPreview: "Automation disabled; manual controls are available",
+    automationUpdateFailed: "Unable to update automation settings",
+    scanningSharePoint: "Scanning SharePoint…",
+    scanStarted: "MRC scan started",
+    scanCompleted: "MRC scan completed and saved",
+    noSavedScan: "No saved scan exists for this reporting cycle",
+    snapshotLoadFailed: "Unable to load the saved scan",
+    scanSharePoint: "Scan SharePoint",
+    excelFiles: "Excel files",
+    projectOwners: "Project owners",
+    individualDrafts: "One individual draft per owner",
+    missingUpdates: "Missing updates",
+    mondayRecipients: "Monday reminder recipients",
+    schedule: "Schedule",
+    targetNextWeek: "Target: next reporting week",
+    allOwners: "All owners",
+    firstReminder: "First reminder",
+    secondReminder: "Second reminder",
+    missingOnly: "Missing only",
+    finalReminder: "Final reminder",
+    recipients: "Recipients",
+    draftQueue: "Draft queue",
+    drafts: "drafts",
+    dataQuality: "Data quality",
+    dataQualityDetail: "1 row skipped: missing owner email. Duplicate project rows were merged.",
+    emailPreview: "Email preview",
+    openTemplate: "Open template",
+    subject: "Subject",
+    previewScanComplete: "Static scan preview refreshed",
   },
 };
 
@@ -140,11 +213,17 @@ const toast = document.querySelector("#toast");
 const activityList = document.querySelector("#activityList");
 const activityStatus = document.querySelector("#activityStatus");
 const languageToggle = document.querySelector("#languageToggle");
+const mrcWorkspace = document.querySelector("#mrcWorkspace");
+const contentGrid = document.querySelector(".content-grid");
+const composerWrap = document.querySelector("#composerWrap");
 let selectedAgent = "jenkins";
 let currentLanguage = "en";
 let toastTimer;
 let eventSource;
+let mrcEventSource;
 let isRunning = false;
+let automationEnabled = false;
+let mrcScanRunning = false;
 let runState = "ready";
 let activitySequence = 0;
 let assistantBody;
@@ -180,7 +259,7 @@ function applyTranslations() {
   languageToggle.querySelector(".language-next").textContent = currentLanguage === "zh" ? "EN" : "中";
   languageToggle.setAttribute("aria-label", t("switchLanguage"));
   languageToggle.title = t("switchLanguage");
-  document.querySelector("#agentDescription").textContent = t("agentDescription");
+  document.querySelector("#agentDescription").textContent = t(agents[selectedAgent].descriptionKey);
   activityStatus.textContent = t(runState);
   document.querySelector("#agentStatus").textContent = isRunning ? t("running") : t("ready");
 }
@@ -192,6 +271,140 @@ function showToast(message) {
   toastTimer = setTimeout(() => toast.classList.remove("is-visible"), 2400);
 }
 
+function updateAutomationControls() {
+  const toggle = document.querySelector("#automationToggle");
+  toggle.classList.toggle("is-active", automationEnabled);
+  toggle.setAttribute("aria-pressed", String(automationEnabled));
+  const label = toggle.querySelector("[data-i18n]");
+  label.dataset.i18n = automationEnabled ? "automationOn" : "enableAutomation";
+  label.textContent = t(label.dataset.i18n);
+  toggle.disabled = mrcScanRunning;
+  document.querySelector("#scanPreview").disabled = automationEnabled || mrcScanRunning;
+  document.querySelector("#previousWeek").disabled = automationEnabled || mrcScanRunning;
+  document.querySelector("#nextWeek").disabled = automationEnabled || mrcScanRunning;
+}
+
+function applyMrcSnapshot(snapshot) {
+  document.querySelector("#fileCount").textContent = snapshot.files_found ?? 0;
+  document.querySelector("#ownerCount").textContent = snapshot.owners_found ?? 0;
+  document.querySelector("#missingCount").textContent = snapshot.missing_comments ?? 0;
+  if (snapshot.workbook_names) {
+    document.querySelector("#workbookNames").textContent = snapshot.workbook_names.join(" · ");
+  }
+  const drafts = snapshot.drafts || [];
+  document.querySelector("#draftCount").textContent = drafts.length;
+  const draftList = document.querySelector("#draftList");
+  draftList.replaceChildren();
+  drafts.forEach((draft, index) => {
+    const row = document.createElement("button");
+    row.className = `draft-row${index === 0 ? " is-selected" : ""}`;
+    row.type = "button";
+    const initials = (draft.owner_name || draft.owner_email)
+      .split(/[\s.@_-]+/).filter(Boolean).slice(0, 2)
+      .map(part => part[0].toUpperCase()).join("");
+    const mark = document.createElement("span");
+    mark.className = "owner-mark";
+    mark.textContent = initials;
+    const details = document.createElement("span");
+    const email = document.createElement("strong");
+    email.textContent = draft.owner_email;
+    const count = document.createElement("small");
+    count.textContent = `${draft.project_count ?? 0} project(s)`;
+    details.append(email, count);
+    const badge = document.createElement("b");
+    badge.textContent = draft.project_count ?? 0;
+    row.append(mark, details, badge);
+    row.addEventListener("click", () => selectMrcDraft(draft, row));
+    draftList.append(row);
+  });
+  if (drafts[0]) selectMrcDraft(drafts[0], draftList.firstElementChild);
+}
+
+function selectMrcDraft(draft, selectedRow) {
+  document.querySelectorAll(".draft-row").forEach(row => row.classList.toggle("is-selected", row === selectedRow));
+  document.querySelector("#previewRecipient").textContent = draft.owner_email;
+  const previewOwner = document.querySelector("#previewOwner");
+  if (previewOwner) previewOwner.textContent = draft.owner_name || draft.owner_email;
+  document.querySelector("#emailSubject").textContent = draft.subject;
+  if (draft.body_html) {
+    const emailDocument = new DOMParser().parseFromString(draft.body_html, "text/html");
+    document.querySelector("#emailCanvas").innerHTML = emailDocument.body.innerHTML;
+  }
+}
+
+async function loadMrcSnapshot(cycleCode) {
+  try {
+    const response = await fetch(`/api/agents/mrc-automation/cycles/${cycleCode}/latest`);
+    if (response.status === 404) {
+      showToast(t("noSavedScan"));
+      return;
+    }
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || t("snapshotLoadFailed"));
+    applyMrcSnapshot(payload);
+  } catch (error) {
+    showToast(error.message || t("snapshotLoadFailed"));
+  }
+}
+
+async function loadMrcAutomation() {
+  try {
+    const response = await fetch("/api/agents/mrc-automation/automation");
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || t("automationUpdateFailed"));
+    automationEnabled = Boolean(payload.enabled);
+    updateAutomationControls();
+  } catch (error) {
+    showToast(error.message || t("automationUpdateFailed"));
+  }
+}
+
+async function runMrcScan() {
+  if (automationEnabled || mrcScanRunning) return;
+  mrcScanRunning = true;
+  updateAutomationControls();
+  const cycleCode = document.querySelector("#targetWeek").textContent;
+  try {
+    const response = await fetch("/api/agents/mrc-automation/scans", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cycle_code: cycleCode, reminder_type: "manual" }),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || t("requestFailed"));
+    showToast(t("scanStarted"));
+    mrcEventSource = new EventSource(`/api/runs/${payload.run_id}/events`);
+    mrcEventSource.onmessage = message => {
+      const event = JSON.parse(message.data);
+      if (event.type === "progress") showToast(event.message);
+      if (event.type === "completed") {
+        applyMrcSnapshot({ ...event.summary, drafts: event.drafts });
+        showToast(t("scanCompleted"));
+        mrcScanRunning = false;
+        updateAutomationControls();
+        mrcEventSource.close();
+      }
+      if (event.type === "error") {
+        showToast(event.message);
+        mrcScanRunning = false;
+        updateAutomationControls();
+        mrcEventSource.close();
+      }
+    };
+    mrcEventSource.onerror = () => {
+      if (!mrcScanRunning) return;
+      showToast(t("connectionInterrupted"));
+      mrcScanRunning = false;
+      updateAutomationControls();
+      mrcEventSource.close();
+    };
+  } catch (error) {
+    showToast(error.message || t("cannotConnect"));
+    mrcScanRunning = false;
+    updateAutomationControls();
+  }
+}
+
 function setAgent(id) {
   const agent = agents[id];
   selectedAgent = id;
@@ -200,24 +413,94 @@ function setAgent(id) {
   avatar.className = `agent-avatar ${agent.avatar}`;
   avatar.textContent = agent.initials;
   document.querySelector("#agentTitle").textContent = agent.title;
-  document.querySelector("#agentDescription").textContent = t("agentDescription");
+  document.querySelector("#agentDescription").textContent = t(agent.descriptionKey);
   document.querySelector("#agentStatus").textContent = t("ready");
-  sendButton.disabled = !agent.ready || isRunning;
-  input.disabled = !agent.ready || isRunning;
+  const isMrc = id === "mrc";
+  document.querySelector(".chat-workspace").classList.toggle("mrc-mode", isMrc);
+  contentGrid.classList.toggle("is-hidden", isMrc);
+  composerWrap.classList.toggle("is-hidden", isMrc);
+  mrcWorkspace.classList.toggle("is-hidden", !isMrc);
+  document.querySelector("#activityToggle").classList.toggle("is-hidden", isMrc);
+  document.querySelector("#runStrip").classList.add("is-hidden");
+  sendButton.disabled = !agent.ready || isRunning || isMrc;
+  input.disabled = !agent.ready || isRunning || isMrc;
   input.placeholder = t("messagePlaceholder");
   sidebar.classList.remove("is-open");
+  if (isMrc) {
+    loadMrcAutomation();
+    loadMrcSnapshot(document.querySelector("#targetWeek").textContent);
+  }
 }
 
-document.querySelectorAll(".agent-item").forEach(item => item.addEventListener("click", () => setAgent(item.dataset.agent)));
+document.querySelectorAll("button.agent-item[data-agent]").forEach(item => item.addEventListener("click", () => setAgent(item.dataset.agent)));
 document.querySelector("#openSidebar").addEventListener("click", () => sidebar.classList.add("is-open"));
 document.querySelector("#closeSidebar").addEventListener("click", () => sidebar.classList.remove("is-open"));
 document.querySelector("#activityToggle").addEventListener("click", () => activityPanel.classList.toggle("is-hidden"));
 document.querySelector("#closeActivity").addEventListener("click", () => activityPanel.classList.add("is-hidden"));
 document.querySelector("#stripClose").addEventListener("click", () => document.querySelector("#runStrip").classList.add("is-hidden"));
 document.querySelector("#settingsButton").addEventListener("click", () => showToast(t("settingsUnavailable")));
+document.querySelector("#automationToggle").addEventListener("click", async () => {
+  const requestedState = !automationEnabled;
+  try {
+    const response = await fetch("/api/agents/mrc-automation/automation", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: requestedState }),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || t("automationUpdateFailed"));
+    automationEnabled = Boolean(payload.enabled);
+    updateAutomationControls();
+    showToast(t(automationEnabled ? "automationEnabledPreview" : "automationDisabledPreview"));
+  } catch (error) {
+    showToast(error.message || t("automationUpdateFailed"));
+  }
+});
+document.querySelector("#scanPreview").addEventListener("click", runMrcScan);
+document.querySelector("#openTemplate").addEventListener("click", () => {
+  document.querySelector("#emailDialogBody").innerHTML = document.querySelector(".email-canvas").outerHTML;
+  document.querySelector("#emailDialog").showModal();
+});
+document.querySelector("#closeEmailDialog").addEventListener("click", () => document.querySelector("#emailDialog").close());
+
+const draftSamples = [
+  { owner: "Alex", email: "alex.kim@example.com", projects: [["Core Platform", "Atlas Migration"], ["Core Platform", "Runtime Refresh"]] },
+  { owner: "Maya", email: "maya.singh@example.com", projects: [["Data Systems", "Metrics Hub"]] },
+  { owner: "Jordan", email: "jordan.lee@example.com", projects: [["Validation", "Falcon CI"]] },
+];
+
+document.querySelectorAll(".draft-row").forEach(button => button.addEventListener("click", () => {
+  document.querySelectorAll(".draft-row").forEach(row => row.classList.toggle("is-selected", row === button));
+  const draft = draftSamples[Number(button.dataset.draft)];
+  document.querySelector("#previewRecipient").textContent = draft.email;
+  document.querySelector("#previewOwner").textContent = draft.owner;
+  document.querySelector("#previewProjects").innerHTML = draft.projects.map(([group, project]) => `<tr><td>${group}</td><td>${project}</td><td><span class="missing-pill">Missing</span></td></tr>`).join("");
+}));
+
+function shiftTargetWeek(offset) {
+  const target = document.querySelector("#targetWeek");
+  const match = target.textContent.match(/^(\d{4})WW(\d{2})$/);
+  if (!match) return;
+  let year = Number(match[1]);
+  let week = Number(match[2]) + offset;
+  if (week < 1) { year -= 1; week = 52; }
+  if (week > 52) { year += 1; week = 1; }
+  const targetWeek = `${year}WW${String(week).padStart(2, "0")}`;
+  const shortWeek = `WW${String(week).padStart(2, "0")}`;
+  target.textContent = targetWeek;
+  document.querySelector("#workbookNames").textContent = `Execution_MRC_${shortWeek}.xlsx · Platform_MRC_${shortWeek}.xlsx`;
+  document.querySelector("#emailSubject").textContent = `Action required: update project status for ${targetWeek}`;
+  const workbookLink = document.querySelector("#workbookLink");
+  if (workbookLink) workbookLink.textContent = `Execution_MRC_${shortWeek}.xlsx`;
+  loadMrcSnapshot(targetWeek);
+}
+
+document.querySelector("#previousWeek").addEventListener("click", () => shiftTargetWeek(-1));
+document.querySelector("#nextWeek").addEventListener("click", () => shiftTargetWeek(1));
 languageToggle.addEventListener("click", () => {
   currentLanguage = currentLanguage === "zh" ? "en" : "zh";
   applyTranslations();
+  updateAutomationControls();
 });
 document.querySelector("#clearButton").addEventListener("click", () => {
   if (isRunning) {
@@ -327,6 +610,7 @@ function handleAgentEvent(event) {
 }
 
 async function submitMessage() {
+  if (selectedAgent !== "jenkins") return;
   const content = input.value.trim();
   if (!content || sendButton.disabled) return;
   appendMessage("user", content);

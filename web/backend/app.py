@@ -8,10 +8,20 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .agent_service import AgentBusyError, agent_service
+from .mrc_service import MrcBusyError, mrc_service
 
 
 class MessageRequest(BaseModel):
     content: str = Field(min_length=1, max_length=4000)
+
+
+class MrcScanRequest(BaseModel):
+    cycle_code: str = Field(pattern=r"^\d{4}WW(?:0[1-9]|[1-4]\d|5[0-3])$")
+    reminder_type: str = Field(default="manual", pattern=r"^(manual|tuesday|thursday|monday)$")
+
+
+class AutomationRequest(BaseModel):
+    enabled: bool
 
 
 app = FastAPI(title="Agent Desk", version="0.1.0")
@@ -25,7 +35,13 @@ async def list_agents() -> list[dict]:
             "name": "Jenkins Log Analyst",
             "description": "Analyze Jenkins failures with logs and workspace code.",
             "status": agent_service.status,
-        }
+        },
+        {
+            "id": mrc_service.agent_id,
+            "name": "MRC Automation",
+            "description": "Scan MRC workbooks and prepare individual email drafts.",
+            "status": mrc_service.status,
+        },
     ]
 
 
@@ -40,9 +56,39 @@ async def submit_message(agent_id: str, request: MessageRequest) -> dict:
     return {"run_id": run_id, "status": "running"}
 
 
+@app.post("/api/agents/mrc-automation/scans", status_code=status.HTTP_202_ACCEPTED)
+async def submit_mrc_scan(request: MrcScanRequest) -> dict:
+    try:
+        run_id = await mrc_service.submit_scan(
+            request.cycle_code, request.reminder_type
+        )
+    except MrcBusyError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"run_id": run_id, "status": "running"}
+
+
+@app.get("/api/agents/mrc-automation/cycles/{cycle_code}/latest")
+async def get_latest_mrc_scan(cycle_code: str) -> dict:
+    scan = await mrc_service.get_latest_scan(cycle_code)
+    if scan is None:
+        raise HTTPException(status_code=404, detail="No completed scan for this cycle")
+    return scan
+
+
+@app.get("/api/agents/mrc-automation/automation")
+async def get_mrc_automation() -> dict:
+    return {"enabled": await mrc_service.get_automation_enabled()}
+
+
+@app.put("/api/agents/mrc-automation/automation")
+async def set_mrc_automation(request: AutomationRequest) -> dict:
+    await mrc_service.set_automation_enabled(request.enabled)
+    return {"enabled": request.enabled}
+
+
 @app.get("/api/runs/{run_id}/events")
 async def stream_events(run_id: str, request: Request) -> StreamingResponse:
-    run = agent_service.get_run(run_id)
+    run = agent_service.get_run(run_id) or mrc_service.get_run(run_id)
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
 
