@@ -27,8 +27,7 @@ log_analysis_agent/
 ├── agent/
 │   └── skill_registry.py
 ├── tools/
-├── main.py
-└── requirements.txt
+└── main.py
 ```
 
 `SKILL.md` describes when and how the skill is used. The Python files in the
@@ -60,7 +59,7 @@ available:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
-python -m pip install -r .\log_analysis_agent\requirements.txt --proxy http://child-prc.intel.com:913
+python -m pip install -r .\requirements.txt --proxy http://child-prc.intel.com:913
 ```
 
 ## Configuration

@@ -1,4 +1,22 @@
--r log_analysis_agent/requirements.txt
--r mrc_automation_agent/requirements.txt
--r web/requirements.txt
+# Shared runtime and infrastructure
+langgraph==1.2.11
 mysql-connector-python>=9.4,<10.0
+pydantic==2.13.5
+python-dotenv==1.2.3
+
+# Shared skills
+github-copilot-sdk==1.0.11
+httpx==0.28.1
+
+# Jenkins log analysis agent
+langchain-core==1.6.1
+langchain-ollama==1.1.0
+
+# MRC automation agent
+cryptography>=46.0,<47.0
+Office365-REST-Python-Client>=2.6,<3.0
+openpyxl>=3.1,<4.0
+
+# Web backend
+fastapi==0.116.1
+uvicorn[standard]==0.35.0

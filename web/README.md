@@ -8,14 +8,13 @@ Refreshing the page clears the visible conversation.
 web/
 ├── backend/       # FastAPI application
 ├── frontend/      # HTML, CSS, and JavaScript
-├── requirements.txt
 └── README.md
 ```
 
 Install dependencies from the repository root:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -r .\web\requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r .\requirements.txt
 ```
 
 Start one Uvicorn worker:
