@@ -18,7 +18,7 @@ const translations = {
     settings: "设置",
     openAgentList: "打开 Agent 列表",
     agentDescription: "定位构建失败原因，并结合 Workspace 源码给出修复建议",
-    mrcDescription: "扫描每周 MRC Excel，识别缺失更新并生成逐人邮件草稿",
+    mrcDescription: "扫描每周 MRC Excel，筛选负责人、发送提醒邮件或生成汇报 PPT",
     newSession: "新会话",
     showActivity: "显示执行轨迹",
     activityTitle: "执行轨迹",
@@ -69,7 +69,7 @@ const translations = {
     cannotConnect: "无法连接 Agent 服务。",
     live: "实时",
     mrcCycle: "报告周期",
-    staticPreview: "草稿模式 · 不会发送邮件",
+    staticPreview: "手动操作模式",
     enableAutomation: "开启自动化",
     automationOn: "自动化已开启",
     automationEnabledPreview: "自动化已开启，手动操作已禁用",
@@ -77,11 +77,24 @@ const translations = {
     automationUpdateFailed: "无法更新自动化设置",
     scanningSharePoint: "正在扫描 SharePoint…",
     scanStarted: "MRC 扫描已启动",
+    mailStarted: "邮件发送任务已启动",
+    pptStarted: "PPT 生成任务已启动",
     scanCompleted: "MRC 扫描已完成并保存",
     noSavedScan: "该报告周期还没有已保存的扫描",
+    noDrafts: "当前筛选没有负责人",
     snapshotLoadFailed: "无法加载已保存的扫描",
     scanSharePoint: "扫描 SharePoint",
+    sendMail: "发送邮件",
+    generatePpt: "生成 PPT",
+    allOwnersOption: "全部",
+    notUpdated: "未填写",
+    mailCompleted: "邮件发送完成",
+    pptCompleted: "PPT 生成完成",
     excelFiles: "Excel 文件",
+    weeklyExcel: "当周 Excel",
+    generatedPpt: "生成的 PPT",
+    noExcelArtifacts: "暂无本地 Excel 文件",
+    noPptArtifacts: "选择“生成 PPT”创建演示文稿",
     projectOwners: "项目负责人",
     individualDrafts: "每位负责人一封独立草稿",
     missingUpdates: "缺失更新",
@@ -117,7 +130,7 @@ const translations = {
     settings: "Settings",
     openAgentList: "Open agent list",
     agentDescription: "Find build failures and verify root causes against workspace source code",
-    mrcDescription: "Scan weekly MRC workbooks, find missing updates, and prepare individual email drafts",
+    mrcDescription: "Scan weekly MRC workbooks, filter owners, send reminders, or generate report PPTs",
     newSession: "New session",
     showActivity: "Show execution activity",
     activityTitle: "Execution activity",
@@ -168,7 +181,7 @@ const translations = {
     cannotConnect: "Unable to connect to the agent service.",
     live: "live",
     mrcCycle: "Reporting cycle",
-    staticPreview: "Draft mode · no email will be sent",
+    staticPreview: "Manual operation mode",
     enableAutomation: "Enable automation",
     automationOn: "Automation on",
     automationEnabledPreview: "Automation enabled; manual controls are disabled",
@@ -176,11 +189,24 @@ const translations = {
     automationUpdateFailed: "Unable to update automation settings",
     scanningSharePoint: "Scanning SharePoint…",
     scanStarted: "MRC scan started",
+    mailStarted: "Mail delivery started",
+    pptStarted: "PPT generation started",
     scanCompleted: "MRC scan completed and saved",
     noSavedScan: "No saved scan exists for this reporting cycle",
+    noDrafts: "No owners match this filter",
     snapshotLoadFailed: "Unable to load the saved scan",
     scanSharePoint: "Scan SharePoint",
+    sendMail: "Send Mail",
+    generatePpt: "Generate PPT",
+    allOwnersOption: "All",
+    notUpdated: "Not Updated",
+    mailCompleted: "Mail delivery completed",
+    pptCompleted: "PPT generation completed",
     excelFiles: "Excel files",
+    weeklyExcel: "Weekly Excel",
+    generatedPpt: "Generated PPT",
+    noExcelArtifacts: "No local Excel files",
+    noPptArtifacts: "Choose Generate PPT to create presentations",
     projectOwners: "Project owners",
     individualDrafts: "One individual draft per owner",
     missingUpdates: "Missing updates",
@@ -224,6 +250,8 @@ let mrcEventSource;
 let isRunning = false;
 let automationEnabled = false;
 let mrcScanRunning = false;
+let currentMrcDrafts = [];
+let draftFilter = "all";
 let runState = "ready";
 let activitySequence = 0;
 let assistantBody;
@@ -282,19 +310,58 @@ function updateAutomationControls() {
   document.querySelector("#scanPreview").disabled = automationEnabled || mrcScanRunning;
   document.querySelector("#previousWeek").disabled = automationEnabled || mrcScanRunning;
   document.querySelector("#nextWeek").disabled = automationEnabled || mrcScanRunning;
+  document.querySelector("#sendMail").disabled = automationEnabled || mrcScanRunning;
+  document.querySelector("#sendAll").disabled = automationEnabled || mrcScanRunning;
+  document.querySelector("#generatePpt").disabled = automationEnabled || mrcScanRunning;
+  document.querySelector("#openTemplate").disabled = automationEnabled || mrcScanRunning;
+  document.querySelectorAll("[data-draft-filter]").forEach(button => {
+    button.disabled = automationEnabled || mrcScanRunning;
+  });
 }
 
-function applyMrcSnapshot(snapshot) {
-  document.querySelector("#fileCount").textContent = snapshot.files_found ?? 0;
-  document.querySelector("#ownerCount").textContent = snapshot.owners_found ?? 0;
-  document.querySelector("#missingCount").textContent = snapshot.missing_comments ?? 0;
-  if (snapshot.workbook_names) {
-    document.querySelector("#workbookNames").textContent = snapshot.workbook_names.join(" · ");
-  }
-  const drafts = snapshot.drafts || [];
+function renderArtifacts(artifacts) {
+  const groups = { excel: [], ppt: [] };
+  (artifacts || []).forEach(artifact => {
+    if (groups[artifact.kind]) groups[artifact.kind].push(artifact);
+  });
+  Object.entries(groups).forEach(([kind, items]) => {
+    const container = document.querySelector(`#${kind}Artifacts`);
+    container.replaceChildren();
+    if (!items.length) {
+      const empty = document.createElement("span");
+      empty.className = "artifact-empty";
+      empty.textContent = t(kind === "excel" ? "noExcelArtifacts" : "noPptArtifacts");
+      container.append(empty);
+      return;
+    }
+    items.forEach(artifact => {
+      const link = document.createElement("a");
+      link.className = "artifact-link";
+      link.href = artifact.download_url;
+      link.download = artifact.file_name;
+      link.textContent = artifact.file_name;
+      container.append(link);
+    });
+  });
+}
+
+function renderDraftQueue() {
+  const drafts = draftFilter === "missing"
+    ? currentMrcDrafts.filter(draft => Number(draft.missing_updates || 0) > 0)
+    : currentMrcDrafts;
   document.querySelector("#draftCount").textContent = drafts.length;
   const draftList = document.querySelector("#draftList");
   draftList.replaceChildren();
+  if (!drafts.length) {
+    const empty = document.createElement("p");
+    empty.className = "activity-empty";
+    empty.textContent = t("noDrafts");
+    draftList.append(empty);
+    document.querySelector("#previewRecipient").textContent = "—";
+    document.querySelector("#emailSubject").textContent = "—";
+    document.querySelector("#emailCanvas").replaceChildren();
+    return;
+  }
   drafts.forEach((draft, index) => {
     const row = document.createElement("button");
     row.className = `draft-row${index === 0 ? " is-selected" : ""}`;
@@ -320,6 +387,18 @@ function applyMrcSnapshot(snapshot) {
   if (drafts[0]) selectMrcDraft(drafts[0], draftList.firstElementChild);
 }
 
+function applyMrcSnapshot(snapshot) {
+  document.querySelector("#fileCount").textContent = snapshot.files_found ?? 0;
+  document.querySelector("#ownerCount").textContent = snapshot.owners_found ?? 0;
+  document.querySelector("#missingCount").textContent = snapshot.missing_comments ?? 0;
+  if (snapshot.workbook_names) {
+    document.querySelector("#workbookNames").textContent = snapshot.workbook_names.join(" · ");
+  }
+  renderArtifacts(snapshot.artifacts || []);
+  currentMrcDrafts = snapshot.drafts || [];
+  renderDraftQueue();
+}
+
 function selectMrcDraft(draft, selectedRow) {
   document.querySelectorAll(".draft-row").forEach(row => row.classList.toggle("is-selected", row === selectedRow));
   document.querySelector("#previewRecipient").textContent = draft.owner_email;
@@ -336,6 +415,14 @@ async function loadMrcSnapshot(cycleCode) {
   try {
     const response = await fetch(`/api/agents/mrc-automation/cycles/${cycleCode}/latest`);
     if (response.status === 404) {
+      applyMrcSnapshot({
+        files_found: 0,
+        owners_found: 0,
+        missing_comments: 0,
+        workbook_names: [],
+        drafts: [],
+        artifacts: [],
+      });
       showToast(t("noSavedScan"));
       return;
     }
@@ -359,27 +446,33 @@ async function loadMrcAutomation() {
   }
 }
 
-async function runMrcScan() {
+async function runMrcAction(endpoint, body, startedMessage) {
   if (automationEnabled || mrcScanRunning) return;
   mrcScanRunning = true;
   updateAutomationControls();
   const cycleCode = document.querySelector("#targetWeek").textContent;
   try {
-    const response = await fetch("/api/agents/mrc-automation/scans", {
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cycle_code: cycleCode, reminder_type: "manual" }),
+      body: JSON.stringify(body),
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.detail || t("requestFailed"));
-    showToast(t("scanStarted"));
+    showToast(startedMessage);
     mrcEventSource = new EventSource(`/api/runs/${payload.run_id}/events`);
     mrcEventSource.onmessage = message => {
       const event = JSON.parse(message.data);
       if (event.type === "progress") showToast(event.message);
       if (event.type === "completed") {
-        applyMrcSnapshot({ ...event.summary, drafts: event.drafts });
-        showToast(t("scanCompleted"));
+        loadMrcSnapshot(cycleCode);
+        if (event.operation === "mail") {
+          showToast(`${t("mailCompleted")}: ${event.sent} sent, ${event.failed} failed`);
+        } else if (event.operation === "ppt") {
+          showToast(t("pptCompleted"));
+        } else {
+          showToast(t("scanCompleted"));
+        }
         mrcScanRunning = false;
         updateAutomationControls();
         mrcEventSource.close();
@@ -403,6 +496,33 @@ async function runMrcScan() {
     mrcScanRunning = false;
     updateAutomationControls();
   }
+}
+
+function runMrcScan() {
+  const cycleCode = document.querySelector("#targetWeek").textContent;
+  return runMrcAction(
+    "/api/agents/mrc-automation/scans",
+    { cycle_code: cycleCode },
+    t("scanStarted"),
+  );
+}
+
+function sendMrcMail() {
+  const cycleCode = document.querySelector("#targetWeek").textContent;
+  return runMrcAction(
+    `/api/agents/mrc-automation/cycles/${cycleCode}/mail`,
+    { include_all: document.querySelector("#sendAll").checked },
+    t("mailStarted"),
+  );
+}
+
+function generateMrcPpt() {
+  const cycleCode = document.querySelector("#targetWeek").textContent;
+  return runMrcAction(
+    `/api/agents/mrc-automation/cycles/${cycleCode}/ppt`,
+    {},
+    t("pptStarted"),
+  );
 }
 
 function setAgent(id) {
@@ -457,6 +577,15 @@ document.querySelector("#automationToggle").addEventListener("click", async () =
   }
 });
 document.querySelector("#scanPreview").addEventListener("click", runMrcScan);
+document.querySelector("#sendMail").addEventListener("click", sendMrcMail);
+document.querySelector("#generatePpt").addEventListener("click", generateMrcPpt);
+document.querySelectorAll("[data-draft-filter]").forEach(button => {
+  button.addEventListener("click", () => {
+    draftFilter = button.dataset.draftFilter;
+    document.querySelectorAll("[data-draft-filter]").forEach(item => item.classList.toggle("is-active", item === button));
+    renderDraftQueue();
+  });
+});
 document.querySelector("#openTemplate").addEventListener("click", () => {
   document.querySelector("#emailDialogBody").innerHTML = document.querySelector(".email-canvas").outerHTML;
   document.querySelector("#emailDialog").showModal();

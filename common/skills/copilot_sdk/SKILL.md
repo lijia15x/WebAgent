@@ -19,8 +19,8 @@ sets the existing source-code directory that Copilot may search while analyzing
 the attachments. When it is omitted, the command uses `COPILOT_WORKSPACE_ROOT`
 from the environment. An explicit `--workspace` takes precedence over the
 environment variable. Other optional arguments are `--model "<model-name>"` and
-`--timeout <seconds>`. The default model is `auto` and the default timeout is 300
-seconds.
+`--timeout <seconds>`. The default model comes from `LOG_ANALYSIS_MODEL` and
+falls back to `gpt-5.5`; the default timeout is 300 seconds.
 
 For Jenkins failures, use the exact `attachment_path` returned by
 `jenkins_api.get_console_log`. The source workspace is normally provided by

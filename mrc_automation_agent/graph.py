@@ -4,13 +4,15 @@ from typing import Any, Literal, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
+from .artifact_store import store_workbooks
 from .config import MrcConfig
 from .email_renderer import render_drafts
 from .excel_parser import parse_workbook
-from .models import EmailDraft, ProjectRecord, WorkbookFile
+from .models import EmailDraft, MrcArtifact, ProjectRecord, WorkbookFile
+from .ppt_generator import generate_weekly_ppts
 
 
-ReminderType = Literal["tuesday", "thursday", "monday", "manual"]
+ReminderType = Literal["tuesday", "thursday", "monday", "manual", "ppt"]
 
 
 class MrcState(TypedDict, total=False):
@@ -22,6 +24,7 @@ class MrcState(TypedDict, total=False):
     records: list[ProjectRecord]
     eligible_records: list[ProjectRecord]
     drafts: list[EmailDraft]
+    artifacts: list[MrcArtifact]
     files_found: int
     error: str
 
@@ -35,6 +38,12 @@ def create_mrc_graph(
     draft_renderer: Callable[
         [str, int, list[ProjectRecord], str], list[EmailDraft]
     ] = render_drafts,
+    workbook_store: Callable[
+        [str, list[WorkbookFile]], list[MrcArtifact]
+    ] = store_workbooks,
+    ppt_generator: Callable[
+        [MrcConfig, str, list[MrcArtifact]], list[MrcArtifact]
+    ] = generate_weekly_ppts,
 ):
     def emit(stage: str, message: str) -> None:
         if on_event is not None:
@@ -45,7 +54,7 @@ def create_mrc_graph(
         reminder_type = state.get("reminder_type", "manual")
         if not re.fullmatch(r"\d{4}WW(?:0[1-9]|[1-4]\d|5[0-3])", cycle_code):
             return {"error": "cycle_code must use the format YYYYWW01-YYYYWW53"}
-        if reminder_type not in {"tuesday", "thursday", "monday", "manual"}:
+        if reminder_type not in {"tuesday", "thursday", "monday", "manual", "ppt"}:
             return {"error": "Unsupported reminder type"}
         emit("prepare_cycle", f"Preparing reporting cycle {cycle_code}")
         return {
@@ -80,6 +89,19 @@ def create_mrc_graph(
         except Exception as exc:
             return {"error": f"SharePoint scan failed: {exc}"}
 
+    def store_workbook_artifacts(state: MrcState) -> dict[str, Any]:
+        if state.get("error"):
+            return {}
+        try:
+            emit("store_workbooks", "Saving weekly Excel workbooks locally")
+            return {
+                "artifacts": workbook_store(
+                    state["cycle_code"], state.get("workbooks", [])
+                )
+            }
+        except Exception as exc:
+            return {"error": f"Could not store workbooks: {exc}"}
+
     def parse_workbooks(state: MrcState) -> dict[str, Any]:
         if state.get("error"):
             return {}
@@ -112,6 +134,8 @@ def create_mrc_graph(
             return {}
         emit("select_recipients", "Selecting one recipient per owner email")
         records = state.get("records", [])
+        if state["reminder_type"] == "ppt":
+            return {"eligible_records": []}
         if state["reminder_type"] == "monday":
             missing_owners = {
                 record.owner_email
@@ -124,6 +148,8 @@ def create_mrc_graph(
     def build_drafts(state: MrcState) -> dict[str, Any]:
         if state.get("error"):
             return {}
+        if state["reminder_type"] == "ppt":
+            return {"drafts": []}
         try:
             emit("build_drafts", "Generating individual email drafts")
             drafts = draft_renderer(
@@ -135,6 +161,22 @@ def create_mrc_graph(
             return {"drafts": drafts}
         except Exception as exc:
             return {"error": f"Draft generation failed: {exc}"}
+
+    def generate_ppt(state: MrcState) -> dict[str, Any]:
+        if state.get("error") or state["reminder_type"] != "ppt":
+            return {}
+        try:
+            emit("generate_ppt", "Generating the weekly executive summary PPT")
+            ppt_artifacts = ppt_generator(
+                config,
+                state["cycle_code"],
+                state.get("artifacts", []),
+            )
+            return {
+                "artifacts": [*state.get("artifacts", []), *ppt_artifacts]
+            }
+        except Exception as exc:
+            return {"error": f"PPT generation failed: {exc}"}
 
     def persist_snapshot(state: MrcState) -> dict[str, Any]:
         if state.get("error"):
@@ -170,9 +212,11 @@ def create_mrc_graph(
     graph.add_node("prepare_cycle", prepare_cycle)
     graph.add_node("create_scan", create_scan)
     graph.add_node("fetch_sharepoint", fetch_sharepoint)
+    graph.add_node("store_workbooks", store_workbook_artifacts)
     graph.add_node("parse_workbooks", parse_workbooks)
     graph.add_node("select_recipients", select_recipients)
     graph.add_node("build_drafts", build_drafts)
+    graph.add_node("generate_ppt", generate_ppt)
     graph.add_node("persist_snapshot", persist_snapshot)
     graph.add_node("fail_scan", fail_scan)
     graph.add_edge(START, "prepare_cycle")
@@ -181,16 +225,20 @@ def create_mrc_graph(
         "prepare_cycle",
         "create_scan",
         "fetch_sharepoint",
+        "store_workbooks",
         "parse_workbooks",
         "select_recipients",
         "build_drafts",
+        "generate_ppt",
     ]
     next_nodes = [
         "create_scan",
         "fetch_sharepoint",
+        "store_workbooks",
         "parse_workbooks",
         "select_recipients",
         "build_drafts",
+        "generate_ppt",
         "persist_snapshot",
     ]
     for node, next_node in zip(ordered_nodes, next_nodes):

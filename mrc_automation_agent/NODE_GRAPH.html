@@ -162,7 +162,7 @@
 <body>
   <header>
     <h1>MRC Automation Agent Node Graph</h1>
-    <p>当前代码的固定执行路径。该 Agent 不使用 Ollama、Planner、Skill 或动态路由；每次扫描都按相同节点顺序读取 SharePoint、解析 Excel、生成邮件草稿并保存 MySQL 快照。</p>
+    <p>当前代码的固定执行路径。该 Agent 不使用 Ollama、Planner、Skill 或动态路由；提醒操作读取 SharePoint、保存并解析 Excel 后生成邮件草稿，独立 PPT 操作只生成汇报文件，最后保存 MySQL 快照。</p>
   </header>
   <main>
     <div class="diagram-wrap">
@@ -175,17 +175,23 @@ flowchart TD
     create_scan -->|成功| fetch_sharepoint[Node 3: fetch_sharepoint&lt;br/&gt;下载目标周期的 xlsx]
     create_scan -->|error| fail_scan
 
-    fetch_sharepoint -->|找到工作簿| parse_workbooks[Node 4: parse_workbooks&lt;br/&gt;按表头解析并合并重复项目]
+    fetch_sharepoint -->|找到工作簿| store_workbooks[Node 4: store_workbooks&lt;br/&gt;保存到 workspace 周目录]
     fetch_sharepoint -->|error / 无文件| fail_scan
 
-    parse_workbooks -->|成功| select_recipients[Node 5: select_recipients&lt;br/&gt;按提醒类型筛选负责人]
+    store_workbooks -->|成功| parse_workbooks[Node 5: parse_workbooks&lt;br/&gt;按表头解析并合并重复项目]
+    store_workbooks -->|error| fail_scan
+
+    parse_workbooks -->|成功| select_recipients[Node 6: select_recipients&lt;br/&gt;按提醒类型筛选负责人]
     parse_workbooks -->|error| fail_scan
 
-    select_recipients -->|成功| build_drafts[Node 6: build_drafts&lt;br/&gt;每个邮箱生成一封草稿]
+    select_recipients -->|成功| build_drafts[Node 7: build_drafts&lt;br/&gt;每个邮箱生成一封草稿]
     select_recipients -->|error| fail_scan
 
-    build_drafts -->|成功| persist_snapshot[Node 7: persist_snapshot&lt;br/&gt;保存项目快照与草稿]
+    build_drafts -->|成功| generate_ppt[Node 8: generate_ppt&lt;br/&gt;ppt 操作用 AI 生成周报]
     build_drafts -->|error| fail_scan
+
+    generate_ppt -->|成功 / 非 ppt 跳过| persist_snapshot[Node 9: persist_snapshot&lt;br/&gt;保存项目快照与草稿]
+    generate_ppt -->|error| fail_scan
 
     persist_snapshot -->|成功| END([END])
     persist_snapshot -->|error| fail_scan
@@ -209,7 +215,7 @@ flowchart TD
           <ul>
             <li>周期转为大写并去除首尾空格。</li>
             <li>校验格式为 <code>YYYYWW01</code> 至 <code>YYYYWW53</code>。</li>
-            <li>校验提醒类型为 manual、tuesday、thursday 或 monday。</li>
+            <li>校验操作类型为 manual、tuesday、thursday、monday 或 ppt。</li>
           </ul>
           <h4>节点输出</h4><pre>{
   "cycle_code": "2026WW38",
@@ -285,8 +291,9 @@ VALUES ('2026WW38', 'running', 'manual')</pre>
 }</pre>
           <h4>筛选规则</h4>
           <ul>
-            <li><code>manual / tuesday / thursday</code>：保留全部解析记录。</li>
+            <li><code>manual / tuesday / thursday</code>：保留全部解析记录并生成全员草稿。</li>
             <li><code>monday</code>：只保留至少一个项目缺少 Comments 的邮箱及该邮箱的项目。</li>
+            <li><code>ppt</code>：不选择邮件收件人，也不生成邮件草稿。</li>
             <li>没有邮箱的记录仍会进入扫描快照，但不会成为邮件收件人。</li>
           </ul>
           <h4>节点输出</h4><pre>{"eligible_records":["&lt;ProjectRecord ...&gt;"]}</pre>
@@ -306,7 +313,7 @@ VALUES ('2026WW38', 'running', 'manual')</pre>
           <h4>处理</h4>
           <ul>
             <li>按规范化邮箱分组，一位负责人一封邮件。</li>
-            <li>读取 <code>status_reminder_email.html</code> 并替换模板变量。</li>
+            <li>读取 <code>templates/status_reminder_email.html</code> 并替换模板变量。</li>
             <li>生成 Subject、HTML Body、项目数和幂等键。</li>
           </ul>
           <h4>节点输出</h4><pre>{
@@ -318,12 +325,30 @@ VALUES ('2026WW38', 'running', 'manual')</pre>
   }]
 }</pre>
           <p class="note">当前节点只生成草稿，不调用邮件服务，也不会发送邮件。</p>
-          <h4>下一跳</h4><p><code>persist_snapshot</code>；模板读取失败进入 <code>fail_scan</code>。</p>
+          <h4>下一跳</h4><p><code>generate_ppt</code>；模板读取失败进入 <code>fail_scan</code>。</p>
         </div>
       </article>
 
       <article>
-        <header><h3>步骤 7 · persist_snapshot</h3><span class="kind">MySQL 事务节点</span></header>
+        <header><h3>步骤 8 · generate_ppt</h3><span class="kind">独立 Copilot 节点</span></header>
+        <div class="node-body">
+          <h4>处理</h4>
+          <ul>
+            <li>非 ppt 操作直接跳过，不调用 Copilot。</li>
+            <li>ppt 操作对本周期保存的每个 Excel 分别生成一份 PPT，并且不生成邮件草稿。</li>
+            <li>Copilot 检查工作簿的 sheet 列表并识别执行状态数据，不依赖固定文件名、sheet 名、表头行或列位置。</li>
+            <li>使用代码中固定的 <code>templates/DMR Johnson City SXT Executive Summary V2.pptx</code> 模板。</li>
+            <li>通过公共 <code>common.skills.copilot_sdk</code> 客户端调用 <code>MRC_PPT_MODEL</code>。</li>
+          </ul>
+          <h4>节点输出</h4><pre>{
+  "artifacts": ["&lt;Excel artifacts&gt;", "&lt;one PPT per Excel&gt;"]
+}</pre>
+          <h4>下一跳</h4><p><code>persist_snapshot</code>；生成失败进入 <code>fail_scan</code>。</p>
+        </div>
+      </article>
+
+      <article>
+        <header><h3>步骤 9 · persist_snapshot</h3><span class="kind">MySQL 事务节点</span></header>
         <div class="node-body">
           <h4>节点输入</h4><pre>{
   "scan_run_id": 42,
@@ -374,9 +399,18 @@ VALUES ('2026WW38', 'running', 'manual')</pre>
           <h4>周期缓存</h4><pre>Web GET /api/agents/mrc-automation/cycles/{cycle_code}/latest
   → MrcDatabase.get_latest_scan(...)
   → 直接读取 MySQL，不运行 LangGraph</pre>
+            <h4>独立邮件操作</h4><pre>Web POST /api/agents/mrc-automation/cycles/{cycle_code}/mail
+          → 从最近扫描快照读取草稿
+          → All 或 Not Updated 收件人筛选
+          → Microsoft Graph sendMail
+          → 记录 sending / sent / failed</pre>
+            <h4>独立 PPT 操作</h4><pre>Web POST /api/agents/mrc-automation/cycles/{cycle_code}/ppt
+          → 只读取 workspace 中的当周 Excel
+          → 本地无 Excel 时提示先 Scan SharePoint
+          → Copilot + 固定模板生成可下载 PPT</pre>
           <h4>Enable Automation</h4><pre>Web PUT /api/agents/mrc-automation/automation
   → MySQL mrc_automation_settings.enabled</pre>
-          <p class="note">当前 Enable Automation 只持久化开关并禁用手动控件；后台 Scheduler、自动判断 WW 和实际邮件发送尚未实现。</p>
+            <p class="note">当前 Enable Automation 只持久化开关，并在前后端禁用手动操作；后台 Scheduler 和自动判断 WW 尚未实现。手动 Send Mail 已接入 Microsoft Graph。</p>
         </div>
       </article>
     </section>

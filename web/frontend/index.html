@@ -84,9 +84,11 @@
             <span class="eyebrow" data-i18n="mrcCycle">Reporting cycle</span>
             <div class="week-picker"><button class="icon-button" type="button" id="previousWeek" aria-label="Previous week">‹</button><strong id="targetWeek">2026WW15</strong><button class="icon-button" type="button" id="nextWeek" aria-label="Next week">›</button></div>
           </div>
-          <div class="preview-badge"><i></i><span data-i18n="staticPreview">Draft mode · no email will be sent</span></div>
+          <div class="preview-badge"><i></i><span data-i18n="staticPreview">Manual operation mode</span></div>
           <button class="automation-button" type="button" id="automationToggle" aria-pressed="false"><span class="automation-indicator" aria-hidden="true"></span><span data-i18n="enableAutomation">Enable automation</span></button>
           <button class="sync-button" type="button" id="scanPreview"><span aria-hidden="true">↻</span><span data-i18n="scanSharePoint">Scan SharePoint</span></button>
+          <div class="mail-action"><label><input type="checkbox" id="sendAll"><span data-i18n="allOwnersOption">All</span></label><button class="action-button" type="button" id="sendMail"><span data-i18n="sendMail">Send Mail</span></button></div>
+          <button class="action-button" type="button" id="generatePpt"><span data-i18n="generatePpt">Generate PPT</span></button>
         </div>
 
         <div class="mrc-scroll">
@@ -94,6 +96,11 @@
             <article class="metric"><span data-i18n="excelFiles">Excel files</span><strong id="fileCount">2</strong><small id="workbookNames">Execution_MRC_WW15.xlsx · Platform_MRC_WW15.xlsx</small></article>
             <article class="metric"><span data-i18n="projectOwners">Project owners</span><strong id="ownerCount">8</strong><small data-i18n="individualDrafts">One individual draft per owner</small></article>
             <article class="metric attention"><span data-i18n="missingUpdates">Missing updates</span><strong id="missingCount">3</strong><small data-i18n="mondayRecipients">Monday reminder recipients</small></article>
+          </section>
+
+          <section class="artifact-band" aria-label="Weekly files">
+            <div><span class="eyebrow" data-i18n="weeklyExcel">Weekly Excel</span><div class="artifact-list" id="excelArtifacts"><span class="artifact-empty" data-i18n="noExcelArtifacts">No local Excel files</span></div></div>
+            <div><span class="eyebrow" data-i18n="generatedPpt">Generated PPT</span><div class="artifact-list" id="pptArtifacts"><span class="artifact-empty" data-i18n="noPptArtifacts">Choose Generate PPT to create presentations</span></div></div>
           </section>
 
           <section class="schedule-band" aria-label="Reminder schedule">
@@ -108,6 +115,7 @@
           <div class="mrc-main-grid">
             <section class="draft-panel">
               <header class="panel-heading"><div><span class="eyebrow" data-i18n="recipients">Recipients</span><h2 data-i18n="draftQueue">Draft queue</h2></div><span class="queue-count"><b id="draftCount">3</b> <span data-i18n="drafts">drafts</span></span></header>
+              <div class="queue-filters" role="group" aria-label="Draft queue filter"><button class="is-active" type="button" data-draft-filter="all" data-i18n="allOwnersOption">All</button><button type="button" data-draft-filter="missing" data-i18n="notUpdated">Not Updated</button></div>
               <div class="draft-list" id="draftList">
                 <button class="draft-row is-selected" type="button" data-draft="0"><span class="owner-mark">AK</span><span><strong>alex.kim@example.com</strong><small>Core Platform · Atlas Migration</small></span><b>2</b></button>
                 <button class="draft-row" type="button" data-draft="1"><span class="owner-mark">MS</span><span><strong>maya.singh@example.com</strong><small>Data Systems · Metrics Hub</small></span><b>1</b></button>

@@ -21,7 +21,9 @@ class MrcConfig:
     sharepoint_thumbprint: str
     sharepoint_certificate_path: str
     sharepoint_certificate_password: str
+    mail_sender: str = ""
     header_search_rows: int = 10
+    ppt_model: str = "gpt-5.5"
 
     @classmethod
     def from_env(cls) -> "MrcConfig":
@@ -35,7 +37,9 @@ class MrcConfig:
             sharepoint_certificate_password=os.getenv(
                 "MRC_SHAREPOINT_CERTIFICATE_PASSWORD", ""
             ),
+            mail_sender=os.getenv("MRC_MAIL_SENDER", ""),
             header_search_rows=int(os.getenv("MRC_HEADER_SEARCH_ROWS", "10")),
+            ppt_model=os.getenv("MRC_PPT_MODEL", "gpt-5.5"),
         )
 
     def require_sharepoint(self) -> None:
@@ -50,6 +54,10 @@ class MrcConfig:
                 "MRC_SHAREPOINT_CERTIFICATE_PASSWORD": self.sharepoint_certificate_password,
             }
         )
+
+    def require_mail(self) -> None:
+        self.require_sharepoint()
+        self._require({"MRC_MAIL_SENDER": self.mail_sender})
 
     @staticmethod
     def _require(values: dict[str, str]) -> None:

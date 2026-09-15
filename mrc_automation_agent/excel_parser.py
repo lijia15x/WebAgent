@@ -36,7 +36,7 @@ def _header_name(value: Any) -> str | None:
 
 
 def _target_week(workbook_name: str) -> str | None:
-    match = re.search(r"\bWW\s*0?([1-9]|[1-4]\d|5[0-3])\b", workbook_name, re.IGNORECASE)
+    match = re.search(r"WW\s*0?([1-9]|[1-4]\d|5[0-3])\b", workbook_name, re.IGNORECASE)
     return match.group(1) if match else None
 
 
@@ -74,41 +74,50 @@ def parse_workbook(workbook: WorkbookFile, header_search_rows: int) -> list[Proj
     try:
         if not excel.worksheets:
             raise WorkbookFormatError(f"Workbook has no worksheets: {workbook.name}")
-        worksheet = excel.worksheets[0]
-        header_row, columns = _find_headers(
-            worksheet, header_search_rows, workbook.name
-        )
         records: list[ProjectRecord] = []
-        for source_row, values in enumerate(
-            worksheet.iter_rows(min_row=header_row + 1, values_only=True),
-            start=header_row + 1,
-        ):
-            def value(name: str) -> str:
-                column = columns.get(name)
-                if column is None or column >= len(values):
-                    return ""
-                return str(values[column] or "").strip()
-
-            project_name = value("project_name")
-            if not project_name:
-                continue
-            owner_name = value("owner_name")
-            owner_email = value("owner_email").lower()
-            if not owner_email and EMAIL_PATTERN.fullmatch(owner_name):
-                owner_email = owner_name.lower()
-                owner_name = ""
-            records.append(
-                ProjectRecord(
-                    workbook_name=workbook.name,
-                    workbook_url=workbook.source_url,
-                    sheet_name=worksheet.title,
-                    source_row=source_row,
-                    function_team=value("function_team"),
-                    project_name=project_name,
-                    owner_name=owner_name,
-                    owner_email=owner_email,
-                    status_comments=value("status_comments"),
+        parsed_sheet = False
+        for worksheet in excel.worksheets:
+            try:
+                header_row, columns = _find_headers(
+                    worksheet, header_search_rows, workbook.name
                 )
+            except WorkbookFormatError:
+                continue
+            parsed_sheet = True
+            for source_row, values in enumerate(
+                worksheet.iter_rows(min_row=header_row + 1, values_only=True),
+                start=header_row + 1,
+            ):
+                def value(name: str) -> str:
+                    column = columns.get(name)
+                    if column is None or column >= len(values):
+                        return ""
+                    return str(values[column] or "").strip()
+
+                project_name = value("project_name")
+                if not project_name:
+                    continue
+                owner_name = value("owner_name")
+                owner_email = value("owner_email").lower()
+                if not owner_email and EMAIL_PATTERN.fullmatch(owner_name):
+                    owner_email = owner_name.lower()
+                    owner_name = ""
+                records.append(
+                    ProjectRecord(
+                        workbook_name=workbook.name,
+                        workbook_url=workbook.source_url,
+                        sheet_name=worksheet.title,
+                        source_row=source_row,
+                        function_team=value("function_team"),
+                        project_name=project_name,
+                        owner_name=owner_name,
+                        owner_email=owner_email,
+                        status_comments=value("status_comments"),
+                    )
+                )
+        if not parsed_sheet:
+            raise WorkbookFormatError(
+                f"Could not find a supported worksheet in {workbook.name}"
             )
         return records
     finally:

@@ -94,6 +94,28 @@ class ExcelParserTests(unittest.TestCase):
         self.assertEqual("Example Owner", records[0].owner_name)
         self.assertEqual("Current status", records[0].status_comments)
 
+    def test_finds_week_column_in_underscore_file_name_and_later_sheet(self) -> None:
+        excel = Workbook()
+        excel.active.title = "Instructions"
+        sheet = excel.create_sheet("Execution Status")
+        sheet.append(["Project", "Owner Email", "WW15"])
+        sheet.append(["Project A", "owner@example.com", "Current status"])
+        content = BytesIO()
+        excel.save(content)
+
+        records = parse_workbook(
+            WorkbookFile(
+                "Execution_MRC_WW15.xlsx",
+                "https://example.invalid/Execution_MRC_WW15.xlsx",
+                content.getvalue(),
+            ),
+            header_search_rows=5,
+        )
+
+        self.assertEqual(1, len(records))
+        self.assertEqual("Execution Status", records[0].sheet_name)
+        self.assertEqual("Current status", records[0].status_comments)
+
 
 if __name__ == "__main__":
     unittest.main()

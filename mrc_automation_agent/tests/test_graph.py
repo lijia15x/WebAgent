@@ -2,7 +2,7 @@ import unittest
 
 from mrc_automation_agent.config import MrcConfig
 from mrc_automation_agent.graph import create_mrc_graph
-from mrc_automation_agent.models import EmailDraft, ProjectRecord, WorkbookFile
+from mrc_automation_agent.models import EmailDraft, MrcArtifact, ProjectRecord, WorkbookFile
 
 
 def make_config() -> MrcConfig:
@@ -59,8 +59,18 @@ class MrcGraphTests(unittest.TestCase):
             self.assertEqual(["alex@example.com"], [item.owner_email for item in eligible])
             return [EmailDraft("Alex", "alex@example.com", "Subject", "<p>Body</p>", 1, "key")]
 
+        def store(cycle_code, workbooks):
+            return [MrcArtifact("excel", "MRC.xlsx", "2026WW38/excel/MRC.xlsx")]
+
         graph = create_mrc_graph(
-            make_config(), database, sharepoint, events.append, parser, renderer
+            make_config(),
+            database,
+            sharepoint,
+            events.append,
+            parser,
+            renderer,
+            store,
+            lambda *args: self.fail("Monday reminder must not generate a PPT"),
         )
         result = graph.invoke(
             {"cycle_code": "2026WW38", "reminder_type": "monday", "triggered_by": "manual"}
@@ -70,11 +80,13 @@ class MrcGraphTests(unittest.TestCase):
         self.assertEqual(1, sharepoint.calls)
         self.assertEqual(2, len(database.completed[2]))
         self.assertEqual(1, len(database.completed[3]))
+        self.assertEqual(["excel"], [item.kind for item in result["artifacts"]])
         self.assertEqual(
             [
                 "prepare_cycle",
                 "create_scan",
                 "fetch_sharepoint",
+                "store_workbooks",
                 "parse_workbooks",
                 "select_recipients",
                 "build_drafts",
@@ -82,6 +94,64 @@ class MrcGraphTests(unittest.TestCase):
             ],
             [event["stage"] for event in events],
         )
+
+    def test_ppt_run_generates_presentation_without_email_drafts(self) -> None:
+        database = FakeDatabase()
+        generated = []
+
+        def generate_ppt(config, cycle_code, artifacts):
+            generated.append(cycle_code)
+            return [
+                MrcArtifact(
+                    "ppt",
+                    "MRC_generated.pptx",
+                    "2026WW38/ppt/MRC_generated.pptx",
+                    "MRC.xlsx",
+                )
+            ]
+
+        graph = create_mrc_graph(
+            make_config(),
+            database,
+            FakeSharePoint(),
+            workbook_parser=lambda workbook, rows: [],
+            draft_renderer=lambda *args: self.fail("PPT run must not render email drafts"),
+            workbook_store=lambda cycle, workbooks: [
+                MrcArtifact("excel", "MRC.xlsx", f"{cycle}/excel/MRC.xlsx")
+            ],
+            ppt_generator=generate_ppt,
+        )
+        result = graph.invoke(
+            {"cycle_code": "2026WW38", "reminder_type": "ppt", "triggered_by": "manual"}
+        )
+
+        self.assertEqual("", result["error"])
+        self.assertEqual(["2026WW38"], generated)
+        self.assertEqual([], result["drafts"])
+        self.assertEqual(["excel", "ppt"], [item.kind for item in result["artifacts"]])
+
+    def test_manual_scan_stores_excel_without_generating_ppt(self) -> None:
+        database = FakeDatabase()
+        sharepoint = FakeSharePoint()
+        generated = []
+
+        graph = create_mrc_graph(
+            make_config(),
+            database,
+            sharepoint,
+            workbook_parser=lambda workbook, rows: [],
+            workbook_store=lambda cycle, workbooks: [
+                MrcArtifact("excel", "MRC.xlsx", f"{cycle}/excel/MRC.xlsx")
+            ],
+            ppt_generator=lambda *args: generated.append(args),
+        )
+        result = graph.invoke(
+            {"cycle_code": "2026WW38", "reminder_type": "manual", "triggered_by": "manual"}
+        )
+
+        self.assertEqual("", result["error"])
+        self.assertEqual([], generated)
+        self.assertEqual(["excel"], [item.kind for item in result["artifacts"]])
 
     def test_invalid_cycle_stops_before_external_calls(self) -> None:
         database = FakeDatabase()

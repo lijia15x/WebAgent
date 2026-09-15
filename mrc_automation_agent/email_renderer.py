@@ -5,7 +5,7 @@ from pathlib import Path
 from .models import EmailDraft, ProjectRecord
 
 
-TEMPLATE_PATH = Path(__file__).with_name("status_reminder_email.html")
+TEMPLATE_PATH = Path(__file__).with_name("templates") / "status_reminder_email.html"
 
 
 def render_drafts(
@@ -27,15 +27,20 @@ def render_drafts(
             dict.fromkeys(record.function_team for record in owner_records if record.function_team)
         )
         projects = ", ".join(dict.fromkeys(record.project_name for record in owner_records))
-        workbook_names = ", ".join(
-            dict.fromkeys(record.workbook_name for record in owner_records)
+        workbooks = {
+            record.workbook_name: record.workbook_url for record in owner_records
+        }
+        workbook_links = "<br>".join(
+            f'<a href="{escape(url, quote=True)}" style="color:#0f766e; font-weight:700; text-decoration:none;">{escape(name)}</a>'
+            for name, url in workbooks.items()
         )
+        first_workbook_url = next(iter(workbooks.values()), "")
         body_html = (
             template.replace("{{OWNER}}", escape(first.owner_name or owner_email))
             .replace("{{FUNCTION_TEAM}}", escape(function_teams))
             .replace("{{PROJECT_NAME}}", escape(projects))
-            .replace("{{EXCEL_LINK}}", escape(first.workbook_url, quote=True))
-            .replace("{{EXCEL_FILE_NAME}}", escape(workbook_names))
+            .replace("{{EXCEL_LINKS}}", workbook_links)
+            .replace("{{EXCEL_LINK}}", escape(first_workbook_url, quote=True))
         )
         drafts.append(
             EmailDraft(

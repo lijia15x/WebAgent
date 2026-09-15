@@ -11,7 +11,7 @@ def main() -> None:
     parser.add_argument("--cycle", required=True, help="Reporting cycle, for example 2026WW38")
     parser.add_argument(
         "--reminder-type",
-        choices=("manual", "tuesday", "thursday", "monday"),
+        choices=("manual", "tuesday", "thursday", "monday", "ppt"),
         default="manual",
     )
     arguments = parser.parse_args()

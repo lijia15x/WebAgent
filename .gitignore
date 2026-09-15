@@ -3,6 +3,7 @@
 __pycache__/
 *.py[cod]
 log_analysis_agent/artifacts/
+mrc_automation_agent/workspace/
 drivers.qat.lce.test.framework/
 copilot.exe
 copilot-win32-x64.zip

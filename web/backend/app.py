@@ -3,9 +3,11 @@ import json
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+
+from mrc_automation_agent.artifact_store import resolve_artifact
 
 from .agent_service import AgentBusyError, agent_service
 from .mrc_service import MrcBusyError, mrc_service
@@ -17,7 +19,10 @@ class MessageRequest(BaseModel):
 
 class MrcScanRequest(BaseModel):
     cycle_code: str = Field(pattern=r"^\d{4}WW(?:0[1-9]|[1-4]\d|5[0-3])$")
-    reminder_type: str = Field(default="manual", pattern=r"^(manual|tuesday|thursday|monday)$")
+
+
+class MrcMailRequest(BaseModel):
+    include_all: bool = False
 
 
 class AutomationRequest(BaseModel):
@@ -59,9 +64,25 @@ async def submit_message(agent_id: str, request: MessageRequest) -> dict:
 @app.post("/api/agents/mrc-automation/scans", status_code=status.HTTP_202_ACCEPTED)
 async def submit_mrc_scan(request: MrcScanRequest) -> dict:
     try:
-        run_id = await mrc_service.submit_scan(
-            request.cycle_code, request.reminder_type
-        )
+        run_id = await mrc_service.submit_scan(request.cycle_code)
+    except MrcBusyError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"run_id": run_id, "status": "running"}
+
+
+@app.post("/api/agents/mrc-automation/cycles/{cycle_code}/ppt", status_code=status.HTTP_202_ACCEPTED)
+async def generate_mrc_ppt(cycle_code: str) -> dict:
+    try:
+        run_id = await mrc_service.submit_ppt(cycle_code)
+    except MrcBusyError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"run_id": run_id, "status": "running"}
+
+
+@app.post("/api/agents/mrc-automation/cycles/{cycle_code}/mail", status_code=status.HTTP_202_ACCEPTED)
+async def send_mrc_mail(cycle_code: str, request: MrcMailRequest) -> dict:
+    try:
+        run_id = await mrc_service.submit_mail(cycle_code, request.include_all)
     except MrcBusyError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return {"run_id": run_id, "status": "running"}
@@ -73,6 +94,25 @@ async def get_latest_mrc_scan(cycle_code: str) -> dict:
     if scan is None:
         raise HTTPException(status_code=404, detail="No completed scan for this cycle")
     return scan
+
+
+@app.get(
+    "/api/agents/mrc-automation/cycles/{cycle_code}/artifacts/{kind}/{file_name}"
+)
+async def download_mrc_artifact(
+    cycle_code: str, kind: str, file_name: str
+) -> FileResponse:
+    try:
+        file_path = resolve_artifact(cycle_code, kind, file_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Artifact not found") from exc
+    if not file_path.is_file():
+        raise HTTPException(status_code=404, detail="Artifact not found")
+    media_types = {
+        "excel": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "ppt": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    }
+    return FileResponse(file_path, media_type=media_types[kind], filename=file_path.name)
 
 
 @app.get("/api/agents/mrc-automation/automation")

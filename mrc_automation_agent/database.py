@@ -192,14 +192,16 @@ class MrcDatabase:
                 ]
                 cursor.execute(
                     """
-                    SELECT delivery.owner_email, delivery.subject,
+                    SELECT delivery.scan_run_id, delivery.owner_email, delivery.subject,
                            delivery.body_html, delivery.reminder_type,
                            delivery.status, COALESCE(items.owner_name, '') AS owner_name,
-                           COALESCE(items.project_count, 0) AS project_count
+                              COALESCE(items.project_count, 0) AS project_count,
+                              COALESCE(items.missing_updates, 0) AS missing_updates
                     FROM mrc_email_deliveries AS delivery
                     LEFT JOIN (
-                        SELECT scan_run_id, owner_email, MAX(owner_name) AS owner_name,
-                               COUNT(*) AS project_count
+                           SELECT scan_run_id, owner_email, MAX(owner_name) AS owner_name,
+                               COUNT(*) AS project_count,
+                               SUM(status_comments IS NULL OR TRIM(status_comments) = '') AS missing_updates
                         FROM mrc_scan_items
                         WHERE scan_run_id = %s
                         GROUP BY scan_run_id, owner_email
@@ -213,5 +215,35 @@ class MrcDatabase:
                 )
                 scan["drafts"] = cursor.fetchall()
                 return scan
+            finally:
+                cursor.close()
+
+    def get_sendable_drafts(self, cycle_code: str, include_all: bool) -> list[dict[str, Any]]:
+        scan = self.get_latest_scan(cycle_code)
+        if scan is None:
+            return []
+        return [
+            draft
+            for draft in scan["drafts"]
+            if draft["status"] in {"draft", "failed"}
+            and (include_all or draft["missing_updates"] > 0)
+        ]
+
+    def update_delivery_status(
+        self, scan_run_id: int, owner_email: str, status: str, error_message: str | None = None
+    ) -> None:
+        with self._database.connection() as connection:
+            cursor = connection.cursor()
+            try:
+                cursor.execute(
+                    """
+                    UPDATE mrc_email_deliveries
+                    SET status = %s, sent_at = CASE WHEN %s = 'sent' THEN CURRENT_TIMESTAMP(6) ELSE sent_at END,
+                        error_message = %s
+                    WHERE scan_run_id = %s AND owner_email = %s
+                    """,
+                    (status, status, error_message, scan_run_id, owner_email),
+                )
+                connection.commit()
             finally:
                 cursor.close()

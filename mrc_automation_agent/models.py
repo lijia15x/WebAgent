@@ -6,6 +6,7 @@ class WorkbookFile:
     name: str
     source_url: str
     content: bytes
+    modified_time: str = ""
 
 
 @dataclass(frozen=True)
@@ -33,3 +34,12 @@ class EmailDraft:
     body_html: str
     project_count: int
     idempotency_key: str
+
+
+@dataclass(frozen=True)
+class MrcArtifact:
+    kind: str
+    file_name: str
+    relative_path: str
+    source_workbook_name: str = ""
+    modified_time: str = ""

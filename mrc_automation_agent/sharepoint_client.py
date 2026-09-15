@@ -53,6 +53,11 @@ class SharePointClient:
                 str(file.properties.get("ServerRelativeUrl", "")),
             )
             workbooks.append(
-                WorkbookFile(name=name, source_url=source_url, content=content.getvalue())
+                WorkbookFile(
+                    name=name,
+                    source_url=source_url,
+                    content=content.getvalue(),
+                    modified_time=str(file.properties.get("TimeLastModified", "")),
+                )
             )
         return workbooks
