@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS `mrc_email_deliveries` (
     `cycle_code` VARCHAR(10) NOT NULL,
     `scan_run_id` BIGINT UNSIGNED NOT NULL,
     `owner_email` VARCHAR(320) NOT NULL,
-    `reminder_type` ENUM('tuesday', 'thursday', 'monday', 'manual') NOT NULL,
+    `reminder_type` ENUM('reminder', 'lastreminder', 'ppt') NOT NULL,
     `status` ENUM('draft', 'sending', 'sent', 'failed') NOT NULL DEFAULT 'draft',
     `subject` VARCHAR(998) NOT NULL,
     `body_html` MEDIUMTEXT NOT NULL,

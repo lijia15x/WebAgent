@@ -104,7 +104,7 @@ class MrcDatabaseTests(unittest.TestCase):
             "2026-09-15T08:00:00Z",
         )
 
-        database.complete_scan(17, "2026WW38", [], [], 1, "manual", [workbook])
+        database.complete_scan(17, "2026WW38", [], [], 1, "reminder", [workbook])
 
         cursor = shared_database.connection_instance.cursor_instance
         workbook_calls = [

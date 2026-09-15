@@ -41,6 +41,7 @@ once:
 mysql -u root -p -e "source mrc_automation_agent/mysql/001_create_database.sql"
 mysql -u root -p webagent -e "source mrc_automation_agent/mysql/002_create_tables.sql"
 mysql -u root -p webagent -e "source mrc_automation_agent/mysql/003_create_scan_workbooks.sql"
+mysql -u root -p webagent -e "source mrc_automation_agent/mysql/004_update_reminder_types.sql"
 ```
 
 Start the Web application:
@@ -62,7 +63,7 @@ python .\log_analysis_agent\main.py
 Run one MRC Automation scan:
 
 ```powershell
-python -m mrc_automation_agent.main --cycle 2026WW38 --reminder-type manual
+python -m mrc_automation_agent.main --cycle 2026WW38 --reminder-type reminder
 ```
 
 The Web UI exposes three independent manual actions: **Scan SharePoint** downloads

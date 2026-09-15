@@ -208,18 +208,18 @@ flowchart TD
         <div class="node-body">
           <h4>节点输入</h4><pre>{
   "cycle_code": "2026WW38",
-  "reminder_type": "manual",
+  "reminder_type": "reminder",
   "triggered_by": "manual"
 }</pre>
           <h4>处理</h4>
           <ul>
             <li>周期转为大写并去除首尾空格。</li>
             <li>校验格式为 <code>YYYYWW01</code> 至 <code>YYYYWW53</code>。</li>
-            <li>校验操作类型为 manual、tuesday、thursday、monday 或 ppt。</li>
+            <li>校验操作类型为 reminder、lastreminder 或 ppt。</li>
           </ul>
           <h4>节点输出</h4><pre>{
   "cycle_code": "2026WW38",
-  "reminder_type": "manual",
+  "reminder_type": "reminder",
   "triggered_by": "manual",
   "error": ""
 }</pre>
@@ -286,13 +286,13 @@ VALUES ('2026WW38', 'running', 'manual')</pre>
         <header><h3>步骤 5 · select_recipients</h3><span class="kind">确定性规则节点</span></header>
         <div class="node-body">
           <h4>节点输入</h4><pre>{
-  "reminder_type": "manual",
+  "reminder_type": "reminder",
   "records": ["&lt;ProjectRecord ...&gt;"]
 }</pre>
           <h4>筛选规则</h4>
           <ul>
-            <li><code>manual / tuesday / thursday</code>：保留全部解析记录并生成全员草稿。</li>
-            <li><code>monday</code>：只保留至少一个项目缺少 Comments 的邮箱及该邮箱的项目。</li>
+            <li><code>reminder</code>：保留全部解析记录并生成全员草稿。</li>
+            <li><code>lastreminder</code>：只保留至少一个项目缺少 Comments 的邮箱及该邮箱的项目。</li>
             <li><code>ppt</code>：不选择邮件收件人，也不生成邮件草稿。</li>
             <li>没有邮箱的记录仍会进入扫描快照，但不会成为邮件收件人。</li>
           </ul>
@@ -307,7 +307,7 @@ VALUES ('2026WW38', 'running', 'manual')</pre>
           <h4>节点输入</h4><pre>{
   "cycle_code": "2026WW38",
   "scan_run_id": 42,
-  "reminder_type": "manual",
+  "reminder_type": "reminder",
   "eligible_records": ["&lt;ProjectRecord ...&gt;"]
 }</pre>
           <h4>处理</h4>
@@ -321,7 +321,7 @@ VALUES ('2026WW38', 'running', 'manual')</pre>
     "owner_email": "owner@example.com",
     "subject": "Action required: update project status for 2026WW38",
     "project_count": 2,
-    "idempotency_key": "2026WW38:42:manual:owner@example.com"
+    "idempotency_key": "2026WW38:42:reminder:owner@example.com"
   }]
 }</pre>
           <p class="note">当前节点只生成草稿，不调用邮件服务，也不会发送邮件。</p>

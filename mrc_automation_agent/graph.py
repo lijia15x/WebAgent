@@ -12,7 +12,7 @@ from .models import EmailDraft, MrcArtifact, ProjectRecord, WorkbookFile
 from .ppt_generator import generate_weekly_ppts
 
 
-ReminderType = Literal["tuesday", "thursday", "monday", "manual", "ppt"]
+ReminderType = Literal["reminder", "lastreminder", "ppt"]
 
 
 class MrcState(TypedDict, total=False):
@@ -51,10 +51,10 @@ def create_mrc_graph(
 
     def prepare_cycle(state: MrcState) -> dict[str, Any]:
         cycle_code = state.get("cycle_code", "").strip().upper()
-        reminder_type = state.get("reminder_type", "manual")
+        reminder_type = state.get("reminder_type", "reminder")
         if not re.fullmatch(r"\d{4}WW(?:0[1-9]|[1-4]\d|5[0-3])", cycle_code):
             return {"error": "cycle_code must use the format YYYYWW01-YYYYWW53"}
-        if reminder_type not in {"tuesday", "thursday", "monday", "manual", "ppt"}:
+        if reminder_type not in {"reminder", "lastreminder", "ppt"}:
             return {"error": "Unsupported reminder type"}
         emit("prepare_cycle", f"Preparing reporting cycle {cycle_code}")
         return {
@@ -136,7 +136,7 @@ def create_mrc_graph(
         records = state.get("records", [])
         if state["reminder_type"] == "ppt":
             return {"eligible_records": []}
-        if state["reminder_type"] == "monday":
+        if state["reminder_type"] == "lastreminder":
             missing_owners = {
                 record.owner_email
                 for record in records

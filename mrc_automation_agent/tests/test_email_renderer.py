@@ -11,7 +11,7 @@ class EmailRendererTests(unittest.TestCase):
             ProjectRecord("Two.xlsx", "https://example.invalid/two", "Status", 3, "Core", "B", "Alex", "alex@example.com", ""),
         ]
 
-        draft = render_drafts("2026WW38", 42, records, "manual")[0]
+        draft = render_drafts("2026WW38", 42, records, "reminder")[0]
 
         self.assertIn("One.xlsx", draft.body_html)
         self.assertIn("Two.xlsx", draft.body_html)

@@ -43,7 +43,7 @@ class FakeSharePoint:
 
 
 class MrcGraphTests(unittest.TestCase):
-    def test_fixed_graph_builds_monday_draft_for_missing_owner(self) -> None:
+    def test_fixed_graph_builds_last_reminder_draft_for_missing_owner(self) -> None:
         database = FakeDatabase()
         sharepoint = FakeSharePoint()
         events: list[dict] = []
@@ -70,10 +70,10 @@ class MrcGraphTests(unittest.TestCase):
             parser,
             renderer,
             store,
-            lambda *args: self.fail("Monday reminder must not generate a PPT"),
+            lambda *args: self.fail("Last reminder must not generate a PPT"),
         )
         result = graph.invoke(
-            {"cycle_code": "2026WW38", "reminder_type": "monday", "triggered_by": "manual"}
+            {"cycle_code": "2026WW38", "reminder_type": "lastreminder", "triggered_by": "manual"}
         )
 
         self.assertEqual("", result["error"])
@@ -130,7 +130,7 @@ class MrcGraphTests(unittest.TestCase):
         self.assertEqual([], result["drafts"])
         self.assertEqual(["excel", "ppt"], [item.kind for item in result["artifacts"]])
 
-    def test_manual_scan_stores_excel_without_generating_ppt(self) -> None:
+    def test_reminder_scan_stores_excel_without_generating_ppt(self) -> None:
         database = FakeDatabase()
         sharepoint = FakeSharePoint()
         generated = []
@@ -146,7 +146,7 @@ class MrcGraphTests(unittest.TestCase):
             ppt_generator=lambda *args: generated.append(args),
         )
         result = graph.invoke(
-            {"cycle_code": "2026WW38", "reminder_type": "manual", "triggered_by": "manual"}
+            {"cycle_code": "2026WW38", "reminder_type": "reminder", "triggered_by": "manual"}
         )
 
         self.assertEqual("", result["error"])
@@ -159,12 +159,31 @@ class MrcGraphTests(unittest.TestCase):
         graph = create_mrc_graph(make_config(), database, sharepoint)
 
         result = graph.invoke(
-            {"cycle_code": "invalid", "reminder_type": "manual", "triggered_by": "manual"}
+            {"cycle_code": "invalid", "reminder_type": "reminder", "triggered_by": "manual"}
         )
 
         self.assertIn("cycle_code", result["error"])
         self.assertEqual(0, sharepoint.calls)
         self.assertIsNone(database.completed)
+
+    def test_legacy_reminder_types_are_rejected(self) -> None:
+        for reminder_type in ("manual", "tuesday", "thursday", "monday"):
+            with self.subTest(reminder_type=reminder_type):
+                database = FakeDatabase()
+                sharepoint = FakeSharePoint()
+                graph = create_mrc_graph(make_config(), database, sharepoint)
+
+                result = graph.invoke(
+                    {
+                        "cycle_code": "2026WW38",
+                        "reminder_type": reminder_type,
+                        "triggered_by": "manual",
+                    }
+                )
+
+                self.assertEqual("Unsupported reminder type", result["error"])
+                self.assertEqual(0, sharepoint.calls)
+                self.assertIsNone(database.completed)
 
 
 if __name__ == "__main__":

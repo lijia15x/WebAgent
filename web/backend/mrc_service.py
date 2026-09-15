@@ -130,7 +130,7 @@ class MrcService:
                 graph.invoke,
                 {
                     "cycle_code": cycle_code,
-                    "reminder_type": "manual",
+                    "reminder_type": "reminder",
                     "triggered_by": "manual",
                 },
             )
