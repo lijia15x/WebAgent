@@ -82,7 +82,7 @@
         <div class="mrc-toolbar">
           <div>
             <span class="eyebrow" data-i18n="mrcCycle">Reporting cycle</span>
-            <div class="week-picker"><button class="icon-button" type="button" id="previousWeek" aria-label="Previous week">‹</button><strong id="targetWeek">2026WW15</strong><button class="icon-button" type="button" id="nextWeek" aria-label="Next week">›</button></div>
+            <div class="week-picker"><button class="icon-button" type="button" id="previousWeek" aria-label="Previous week">‹</button><strong id="targetWeek">—</strong><button class="icon-button" type="button" id="nextWeek" aria-label="Next week">›</button></div>
           </div>
           <div class="preview-badge"><i></i><span data-i18n="staticPreview">Manual operation mode</span></div>
           <button class="automation-button" type="button" id="automationToggle" aria-pressed="false"><span class="automation-indicator" aria-hidden="true"></span><span data-i18n="enableAutomation">Enable automation</span></button>
@@ -104,12 +104,16 @@
           </section>
 
           <section class="schedule-band" aria-label="Reminder schedule">
-            <div class="schedule-title"><span class="eyebrow" data-i18n="schedule">Schedule</span><strong data-i18n="targetNextWeek">Target: next reporting week</strong></div>
-            <div class="schedule-step is-active"><b>Tue</b><span data-i18n="allOwners">All owners</span><small data-i18n="firstReminder">First reminder</small></div>
-            <div class="schedule-line"></div>
-            <div class="schedule-step"><b>Thu</b><span data-i18n="allOwners">All owners</span><small data-i18n="secondReminder">Second reminder</small></div>
-            <div class="schedule-line"></div>
-            <div class="schedule-step warning"><b>Mon</b><span data-i18n="missingOnly">Missing only</span><small data-i18n="finalReminder">Final reminder</small></div>
+            <span class="eyebrow schedule-heading" data-i18n="schedule">Schedule</span>
+            <div class="schedule-flow">
+              <div class="schedule-step is-active"><b>Last Tue</b><span data-i18n="allOwners">All owners</span><small data-i18n="firstReminder">First reminder</small></div>
+              <div class="schedule-line"></div>
+              <div class="schedule-step"><b>Last Thu</b><span data-i18n="allOwners">All owners</span><small data-i18n="secondReminder">Second reminder</small></div>
+              <div class="schedule-line"></div>
+              <div class="schedule-step warning"><b>Mon</b><span data-i18n="missingOnly">Missing only</span><small data-i18n="finalReminder">Final reminder</small></div>
+              <div class="schedule-line"></div>
+              <div class="schedule-step ppt-step"><b>Tue</b><span data-i18n="generatePpt">Generate PPT</span><small data-i18n="weeklyReport">Weekly report</small></div>
+            </div>
           </section>
 
           <div class="mrc-main-grid">
@@ -126,7 +130,7 @@
 
             <section class="email-panel">
               <header class="panel-heading"><div><span class="eyebrow" data-i18n="emailPreview">Email preview</span><h2 id="previewRecipient">alex.kim@example.com</h2></div><button class="quiet-button" type="button" id="openTemplate" data-i18n="openTemplate">Open template</button></header>
-              <div class="email-meta"><span data-i18n="subject">Subject</span><strong id="emailSubject">Action required: update project status for 2026WW15</strong></div>
+              <div class="email-meta"><span data-i18n="subject">Subject</span><strong id="emailSubject">—</strong></div>
               <div class="email-canvas" id="emailCanvas">
                 <div class="email-banner"><small>Project status reminder</small><strong>Please update the project status.</strong></div>
                 <div class="email-content">

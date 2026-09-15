@@ -100,12 +100,12 @@ const translations = {
     missingUpdates: "缺失更新",
     mondayRecipients: "周一提醒收件人",
     schedule: "提醒计划",
-    targetNextWeek: "目标：下一报告周",
     allOwners: "全部负责人",
     firstReminder: "首次提醒",
     secondReminder: "再次提醒",
     missingOnly: "仅未填写者",
     finalReminder: "最终提醒",
+    weeklyReport: "周报",
     recipients: "收件人",
     draftQueue: "草稿队列",
     drafts: "封草稿",
@@ -212,12 +212,12 @@ const translations = {
     missingUpdates: "Missing updates",
     mondayRecipients: "Monday reminder recipients",
     schedule: "Schedule",
-    targetNextWeek: "Target: next reporting week",
     allOwners: "All owners",
     firstReminder: "First reminder",
     secondReminder: "Second reminder",
     missingOnly: "Missing only",
     finalReminder: "Final reminder",
+    weeklyReport: "Weekly report",
     recipients: "Recipients",
     draftQueue: "Draft queue",
     drafts: "drafts",
@@ -525,6 +525,28 @@ function generateMrcPpt() {
   );
 }
 
+function isoWeekParts(date) {
+  const localDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = localDate.getUTCDay() || 7;
+  localDate.setUTCDate(localDate.getUTCDate() + 4 - day);
+  const isoYear = localDate.getUTCFullYear();
+  const yearStart = new Date(Date.UTC(isoYear, 0, 1));
+  const week = Math.ceil((((localDate - yearStart) / 86400000) + 1) / 7);
+  return { year: isoYear, week };
+}
+
+function cycleCodeForDate(date) {
+  const { year, week } = isoWeekParts(date);
+  return `${year}WW${String(week).padStart(2, "0")}`;
+}
+
+function setTargetWeek(cycleCode, loadSnapshot = true) {
+  const target = document.querySelector("#targetWeek");
+  target.textContent = cycleCode;
+  document.querySelector("#emailSubject").textContent = `Action required: update project status for ${cycleCode}`;
+  if (loadSnapshot) loadMrcSnapshot(cycleCode);
+}
+
 function setAgent(id) {
   const agent = agents[id];
   selectedAgent = id;
@@ -547,8 +569,10 @@ function setAgent(id) {
   input.placeholder = t("messagePlaceholder");
   sidebar.classList.remove("is-open");
   if (isMrc) {
+    const currentCycle = cycleCodeForDate(new Date());
+    setTargetWeek(currentCycle, false);
     loadMrcAutomation();
-    loadMrcSnapshot(document.querySelector("#targetWeek").textContent);
+    loadMrcSnapshot(currentCycle);
   }
 }
 
@@ -607,21 +631,15 @@ document.querySelectorAll(".draft-row").forEach(button => button.addEventListene
 }));
 
 function shiftTargetWeek(offset) {
-  const target = document.querySelector("#targetWeek");
-  const match = target.textContent.match(/^(\d{4})WW(\d{2})$/);
+  const match = document.querySelector("#targetWeek").textContent.match(/^(\d{4})WW(\d{2})$/);
   if (!match) return;
-  let year = Number(match[1]);
-  let week = Number(match[2]) + offset;
-  if (week < 1) { year -= 1; week = 52; }
-  if (week > 52) { year += 1; week = 1; }
-  const targetWeek = `${year}WW${String(week).padStart(2, "0")}`;
-  const shortWeek = `WW${String(week).padStart(2, "0")}`;
-  target.textContent = targetWeek;
-  document.querySelector("#workbookNames").textContent = `Execution_MRC_${shortWeek}.xlsx · Platform_MRC_${shortWeek}.xlsx`;
-  document.querySelector("#emailSubject").textContent = `Action required: update project status for ${targetWeek}`;
-  const workbookLink = document.querySelector("#workbookLink");
-  if (workbookLink) workbookLink.textContent = `Execution_MRC_${shortWeek}.xlsx`;
-  loadMrcSnapshot(targetWeek);
+  const isoYear = Number(match[1]);
+  const isoWeek = Number(match[2]);
+  const januaryFourth = new Date(isoYear, 0, 4);
+  const januaryFourthDay = januaryFourth.getDay() || 7;
+  const monday = new Date(isoYear, 0, 4 - januaryFourthDay + 1);
+  monday.setDate(monday.getDate() + ((isoWeek - 1 + offset) * 7));
+  setTargetWeek(cycleCodeForDate(monday));
 }
 
 document.querySelector("#previousWeek").addEventListener("click", () => shiftTargetWeek(-1));
