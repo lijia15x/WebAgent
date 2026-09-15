@@ -1,0 +1,1 @@
+"""Shared skill implementations for project agents."""

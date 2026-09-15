@@ -1,6 +1,5 @@
 cryptography>=46.0,<47.0
 langgraph==1.2.11
-mysql-connector-python>=9.4,<10.0
 Office365-REST-Python-Client>=2.6,<3.0
 openpyxl>=3.1,<4.0
 python-dotenv==1.2.3

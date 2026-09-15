@@ -6,13 +6,13 @@ user's goal is complete.
 
 ## Skill layout
 
-The `skills` package is next to `agent`. Each skill is self-contained under
-`skills/<skill_name>/`:
+Skill implementations are shared under `common/skills/<skill_name>/`. The
+Jenkins agent keeps an explicit allowlist in `agent/skill_registry.py`, so adding
+another shared skill does not make it available to this agent automatically:
 
 ```text
-log_analysis_agent/
-├── agent/
-├── skills/
+common/
+└── skills/
 │   ├── jenkins_api/
 │   │   ├── SKILL.md
 │   │   ├── client.py
@@ -23,14 +23,17 @@ log_analysis_agent/
 │       ├── SKILL.md
 │       ├── copilot_sdk_client.py
 │       └── run_copilot.py
+log_analysis_agent/
+├── agent/
+│   └── skill_registry.py
 ├── tools/
 ├── main.py
 └── requirements.txt
 ```
 
 `SKILL.md` describes when and how the skill is used. The Python files in the
-same directory implement that skill. Shared registration infrastructure stays
-in `skills/base.py`.
+same directory implement that skill. The agent-owned registry and contracts
+select only `jenkins_api` and `copilot_sdk`.
 
 The execution lifecycle is:
 
@@ -43,7 +46,7 @@ route skill -> load SKILL.md -> plan -> validate -> execute command
 The review step may continue the current skill, finish the task, ask the user,
 or return to the router to select another skill. A skill documents executable
 Python module commands. Node 3 runs them without a shell and accepts only modules
-under `log_analysis_agent.skills`.
+explicitly allowed by the Jenkins agent under `common.skills`.
 
 Copilot and Claude skill documents can use the same directory convention. Their
 commands must be implemented as Python modules inside the skill package and must
@@ -62,7 +65,8 @@ python -m pip install -r .\log_analysis_agent\requirements.txt --proxy http://ch
 
 ## Configuration
 
-Set the values in `.env`. The application loads this file automatically. Do not
+Copy the repository-root `.env.example` to the repository-root `.env`, then set
+the values there. The application loads this shared file automatically. Do not
 commit real API tokens. The Jenkins account only needs read access to jobs,
 builds, and logs.
 

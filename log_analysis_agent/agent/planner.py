@@ -2,8 +2,8 @@ import json
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from ..skills.base import SkillDefinition
-from ..skills.contracts import ExecutionPlan, ReviewDecision
+from .contracts import ExecutionPlan, ReviewDecision
+from .skill_registry import SkillDefinition
 
 
 PLANNER_PROMPT = """You are executing one selected skill.

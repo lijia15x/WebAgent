@@ -1,42 +1,22 @@
-from collections.abc import Iterator
-from contextlib import contextmanager
 from typing import Any
 
-from .config import MrcConfig
+from common.database import MySqlDatabase
+
 from .models import EmailDraft, ProjectRecord
 
 
 class MrcDatabase:
-    def __init__(self, config: MrcConfig) -> None:
-        self._config = config
-
-    @contextmanager
-    def _connection(self) -> Iterator[Any]:
-        self._config.require_database()
-        import mysql.connector
-
-        connection = mysql.connector.connect(
-            host=self._config.database_host,
-            port=self._config.database_port,
-            database=self._config.database_name,
-            user=self._config.database_user,
-            password=self._config.database_password,
-            charset="utf8mb4",
-            connection_timeout=10,
-        )
-        try:
-            yield connection
-        finally:
-            connection.close()
+    def __init__(self, database: MySqlDatabase | None = None) -> None:
+        self._database = database or MySqlDatabase()
 
     def create_scan(self, cycle_code: str, triggered_by: str) -> int:
-        with self._connection() as connection:
+        with self._database.connection() as connection:
             cursor = connection.cursor()
             try:
                 connection.start_transaction()
                 cursor.execute(
                     """
-                    INSERT INTO reporting_cycles (cycle_code)
+                    INSERT INTO mrc_reporting_cycles (cycle_code)
                     VALUES (%s)
                     ON DUPLICATE KEY UPDATE cycle_code = VALUES(cycle_code)
                     """,
@@ -44,7 +24,7 @@ class MrcDatabase:
                 )
                 cursor.execute(
                     """
-                    INSERT INTO scan_runs (cycle_code, status, triggered_by)
+                    INSERT INTO mrc_scan_runs (cycle_code, status, triggered_by)
                     VALUES (%s, 'running', %s)
                     """,
                     (cycle_code, triggered_by),
@@ -69,13 +49,13 @@ class MrcDatabase:
     ) -> None:
         owners = {record.owner_email for record in records if record.owner_email}
         missing_comments = sum(record.is_missing_update for record in records)
-        with self._connection() as connection:
+        with self._database.connection() as connection:
             cursor = connection.cursor()
             try:
                 connection.start_transaction()
                 cursor.executemany(
                     """
-                    INSERT INTO scan_items (
+                    INSERT INTO mrc_scan_items (
                         scan_run_id, workbook_name, workbook_url, sheet_name,
                         source_row, function_team, project_name, owner_name,
                         owner_email, status_comments
@@ -99,7 +79,7 @@ class MrcDatabase:
                 )
                 cursor.executemany(
                     """
-                    INSERT INTO email_deliveries (
+                    INSERT INTO mrc_email_deliveries (
                         cycle_code, scan_run_id, owner_email, reminder_type,
                         status, subject, body_html, idempotency_key
                     ) VALUES (%s, %s, %s, %s, 'draft', %s, %s, %s)
@@ -120,7 +100,7 @@ class MrcDatabase:
                 )
                 cursor.execute(
                     """
-                    UPDATE scan_runs
+                    UPDATE mrc_scan_runs
                     SET status = 'succeeded', completed_at = CURRENT_TIMESTAMP(6),
                         files_found = %s, owners_found = %s, missing_comments = %s
                     WHERE id = %s
@@ -129,7 +109,7 @@ class MrcDatabase:
                 )
                 cursor.execute(
                     """
-                    UPDATE reporting_cycles SET latest_scan_id = %s
+                    UPDATE mrc_reporting_cycles SET latest_scan_id = %s
                     WHERE cycle_code = %s
                     """,
                     (scan_run_id, cycle_code),
@@ -142,12 +122,12 @@ class MrcDatabase:
                 cursor.close()
 
     def fail_scan(self, scan_run_id: int, message: str) -> None:
-        with self._connection() as connection:
+        with self._database.connection() as connection:
             cursor = connection.cursor()
             try:
                 cursor.execute(
                     """
-                    UPDATE scan_runs
+                    UPDATE mrc_scan_runs
                     SET status = 'failed', completed_at = CURRENT_TIMESTAMP(6),
                         error_message = %s
                     WHERE id = %s
@@ -159,21 +139,21 @@ class MrcDatabase:
                 cursor.close()
 
     def get_automation_enabled(self) -> bool:
-        with self._connection() as connection:
+        with self._database.connection() as connection:
             cursor = connection.cursor(dictionary=True)
             try:
-                cursor.execute("SELECT enabled FROM automation_settings WHERE id = 1")
+                cursor.execute("SELECT enabled FROM mrc_automation_settings WHERE id = 1")
                 row = cursor.fetchone()
                 return bool(row and row["enabled"])
             finally:
                 cursor.close()
 
     def set_automation_enabled(self, enabled: bool) -> None:
-        with self._connection() as connection:
+        with self._database.connection() as connection:
             cursor = connection.cursor()
             try:
                 cursor.execute(
-                    "UPDATE automation_settings SET enabled = %s WHERE id = 1",
+                    "UPDATE mrc_automation_settings SET enabled = %s WHERE id = 1",
                     (enabled,),
                 )
                 connection.commit()
@@ -181,14 +161,14 @@ class MrcDatabase:
                 cursor.close()
 
     def get_latest_scan(self, cycle_code: str) -> dict[str, Any] | None:
-        with self._connection() as connection:
+        with self._database.connection() as connection:
             cursor = connection.cursor(dictionary=True)
             try:
                 cursor.execute(
                     """
                     SELECT id, cycle_code, status, triggered_by, started_at,
                            completed_at, files_found, owners_found, missing_comments
-                    FROM scan_runs
+                    FROM mrc_scan_runs
                     WHERE cycle_code = %s AND status = 'succeeded'
                     ORDER BY completed_at DESC
                     LIMIT 1
@@ -201,7 +181,7 @@ class MrcDatabase:
                 cursor.execute(
                     """
                     SELECT DISTINCT workbook_name
-                    FROM scan_items
+                    FROM mrc_scan_items
                     WHERE scan_run_id = %s
                     ORDER BY workbook_name
                     """,
@@ -216,11 +196,11 @@ class MrcDatabase:
                            delivery.body_html, delivery.reminder_type,
                            delivery.status, COALESCE(items.owner_name, '') AS owner_name,
                            COALESCE(items.project_count, 0) AS project_count
-                    FROM email_deliveries AS delivery
+                    FROM mrc_email_deliveries AS delivery
                     LEFT JOIN (
                         SELECT scan_run_id, owner_email, MAX(owner_name) AS owner_name,
                                COUNT(*) AS project_count
-                        FROM scan_items
+                        FROM mrc_scan_items
                         WHERE scan_run_id = %s
                         GROUP BY scan_run_id, owner_email
                     ) AS items

@@ -12,7 +12,7 @@ class SkillDefinition:
         return self.document.read_text(encoding="utf-8")
 
 
-SKILLS_DIR = Path(__file__).resolve().parent
+SKILLS_DIR = Path(__file__).resolve().parents[2] / "common" / "skills"
 
 SKILLS = {
     "jenkins_api": SkillDefinition(

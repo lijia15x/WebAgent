@@ -7,11 +7,6 @@ from mrc_automation_agent.models import EmailDraft, ProjectRecord, WorkbookFile
 
 def make_config() -> MrcConfig:
     return MrcConfig(
-        database_host="localhost",
-        database_port=3306,
-        database_name="test",
-        database_user="test",
-        database_password="test",
         sharepoint_site_url="https://example.invalid",
         sharepoint_folder_template="/mrc/{cycle_code}",
         sharepoint_tenant="test",

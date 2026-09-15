@@ -19,7 +19,7 @@ def main() -> None:
     config = MrcConfig.from_env()
     graph = create_mrc_graph(
         config=config,
-        database=MrcDatabase(config),
+        database=MrcDatabase(),
         sharepoint_client=SharePointClient(config),
         on_event=lambda event: print(f"[{event['stage']}] {event['message']}", flush=True),
     )

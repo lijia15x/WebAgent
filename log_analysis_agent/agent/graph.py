@@ -2,9 +2,9 @@ from collections.abc import Callable
 
 from langgraph.graph import END, START, StateGraph
 
-from ..skills.base import SKILLS
 from ..tools.executor import CommandExecutionError, execute_command, validate_command
 from .planner import plan_skill, review_command_result
+from .skill_registry import SKILLS
 from .state import AgentState
 from .supervisor import select_skill
 

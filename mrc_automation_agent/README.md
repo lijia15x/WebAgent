@@ -16,19 +16,19 @@ The current implementation scans SharePoint workbooks, stores a MySQL snapshot, 
 
 ## MySQL 8.4
 
-Run the SQL files with an administrator account:
+All agent settings are stored in the project-root `.env`. Copy `.env.example` to `.env`, then configure the shared `WEBAGENT_DB_*` values and the MRC-specific `MRC_*` values there. Database connections are managed by `common/database.py`.
+
+For a new database, run:
 
 ```powershell
 mysql -u root -p < mrc_automation_agent/mysql/001_create_database.sql
 mysql -u root -p webagent < mrc_automation_agent/mysql/002_create_tables.sql
 ```
 
-Copy `.env.example` to `.env` in this directory and set the MySQL and SharePoint credentials. The agent loads this file automatically without overriding variables already set in the process environment. The MRC variables use the `MRC_` prefix and do not conflict with the Jenkins agent's separate `log_analysis_agent/.env` file.
-
 ## Dependencies
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -r mrc_automation_agent\requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
 ## Test

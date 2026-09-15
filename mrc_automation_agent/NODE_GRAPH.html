@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MRC Automation Agent Node Graph</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Georgia, "Microsoft YaHei", serif;
+      background: #eef1f3;
+      color: #182126;
+      --ink: #182126;
+      --muted: #59676f;
+      --line: #cbd3d8;
+      --paper: #ffffff;
+      --accent: #006d77;
+      --accent-soft: #e4f2f1;
+      --code: #17252b;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #eef1f3 0%, #f8faf9 55%, #e8f1ef 100%);
+    }
+
+    body > header {
+      padding: 32px clamp(20px, 5vw, 72px) 20px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.86);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(26px, 3vw, 40px);
+      letter-spacing: 0;
+    }
+
+    body > header p {
+      max-width: 880px;
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-family: "Microsoft YaHei", sans-serif;
+      line-height: 1.7;
+    }
+
+    main {
+      max-width: 1500px;
+      margin: 0 auto;
+      padding: 28px clamp(16px, 4vw, 56px) 64px;
+    }
+
+    .diagram {
+      min-width: 1080px;
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--paper);
+    }
+
+    .diagram-wrap {
+      overflow: auto;
+      box-shadow: 0 12px 28px rgba(24, 33, 38, 0.08);
+    }
+
+    h2 {
+      margin: 42px 0 8px;
+      font-size: 24px;
+      letter-spacing: 0;
+    }
+
+    .section-intro {
+      margin: 0 0 20px;
+      color: var(--muted);
+      font-family: "Microsoft YaHei", sans-serif;
+      line-height: 1.7;
+    }
+
+    .node-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr));
+      gap: 18px;
+    }
+
+    article {
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-top: 4px solid var(--accent);
+      border-radius: 6px;
+      background: var(--paper);
+      box-shadow: 0 8px 20px rgba(24, 33, 38, 0.06);
+    }
+
+    article > header {
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid var(--line);
+      background: var(--accent-soft);
+    }
+
+    article h3 {
+      margin: 0;
+      font-size: 19px;
+      letter-spacing: 0;
+    }
+
+    .kind {
+      display: inline-block;
+      margin-top: 7px;
+      color: var(--accent);
+      font: 700 12px/1.4 "Microsoft YaHei", sans-serif;
+      text-transform: uppercase;
+    }
+
+    .node-body {
+      padding: 18px 20px 22px;
+      font-family: "Microsoft YaHei", sans-serif;
+    }
+
+    h4 {
+      margin: 18px 0 7px;
+      color: var(--accent);
+      font-size: 14px;
+      letter-spacing: 0;
+    }
+
+    h4:first-child { margin-top: 0; }
+    p, li { line-height: 1.65; }
+    ul { margin: 6px 0; padding-left: 20px; }
+    pre { overflow: auto; margin: 8px 0 0; }
+
+    pre:not(.mermaid) {
+      padding: 14px 16px;
+      border-radius: 5px;
+      background: var(--code);
+      color: #e8f0f2;
+      font: 13px/1.55 Consolas, monospace;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    code { font-family: Consolas, monospace; }
+
+    .note {
+      padding: 12px 14px;
+      border-left: 3px solid #d39b2a;
+      background: #fff8e8;
+      color: #604b20;
+    }
+
+    .success { border-left-color: #3f8a62; background: #edf7f0; color: #28583e; }
+
+    @media (max-width: 700px) {
+      body > header { padding: 24px 18px 18px; }
+      main { padding: 20px 12px 40px; }
+      .node-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>MRC Automation Agent Node Graph</h1>
+    <p>当前代码的固定执行路径。该 Agent 不使用 Ollama、Planner、Skill 或动态路由；每次扫描都按相同节点顺序读取 SharePoint、解析 Excel、生成邮件草稿并保存 MySQL 快照。</p>
+  </header>
+  <main>
+    <div class="diagram-wrap">
+      <pre class="mermaid diagram">
+flowchart TD
+    START([START]) --> prepare_cycle[Node 1: prepare_cycle&lt;br/&gt;规范并校验 Reporting Cycle]
+    prepare_cycle -->|有效| create_scan[Node 2: create_scan&lt;br/&gt;MySQL 创建 running 扫描记录]
+    prepare_cycle -->|error| fail_scan[fail_scan&lt;br/&gt;统一失败收尾]
+
+    create_scan -->|成功| fetch_sharepoint[Node 3: fetch_sharepoint&lt;br/&gt;下载目标周期的 xlsx]
+    create_scan -->|error| fail_scan
+
+    fetch_sharepoint -->|找到工作簿| parse_workbooks[Node 4: parse_workbooks&lt;br/&gt;按表头解析并合并重复项目]
+    fetch_sharepoint -->|error / 无文件| fail_scan
+
+    parse_workbooks -->|成功| select_recipients[Node 5: select_recipients&lt;br/&gt;按提醒类型筛选负责人]
+    parse_workbooks -->|error| fail_scan
+
+    select_recipients -->|成功| build_drafts[Node 6: build_drafts&lt;br/&gt;每个邮箱生成一封草稿]
+    select_recipients -->|error| fail_scan
+
+    build_drafts -->|成功| persist_snapshot[Node 7: persist_snapshot&lt;br/&gt;保存项目快照与草稿]
+    build_drafts -->|error| fail_scan
+
+    persist_snapshot -->|成功| END([END])
+    persist_snapshot -->|error| fail_scan
+    fail_scan --> END
+      </pre>
+    </div>
+
+    <h2>一次完整扫描的节点输入与输出</h2>
+    <p class="section-intro">示例输入为手动扫描 <code>2026WW38</code>。LangGraph 将完整 State 传入节点，节点只返回需要合并的状态增量。每个业务节点发出 progress 事件，由 Web 通过 SSE 展示。</p>
+
+    <section class="node-grid">
+      <article>
+        <header><h3>步骤 1 · START → prepare_cycle</h3><span class="kind">确定性校验节点</span></header>
+        <div class="node-body">
+          <h4>节点输入</h4><pre>{
+  "cycle_code": "2026WW38",
+  "reminder_type": "manual",
+  "triggered_by": "manual"
+}</pre>
+          <h4>处理</h4>
+          <ul>
+            <li>周期转为大写并去除首尾空格。</li>
+            <li>校验格式为 <code>YYYYWW01</code> 至 <code>YYYYWW53</code>。</li>
+            <li>校验提醒类型为 manual、tuesday、thursday 或 monday。</li>
+          </ul>
+          <h4>节点输出</h4><pre>{
+  "cycle_code": "2026WW38",
+  "reminder_type": "manual",
+  "triggered_by": "manual",
+  "error": ""
+}</pre>
+          <h4>下一跳</h4><p><code>create_scan</code>；校验失败进入 <code>fail_scan</code>。</p>
+        </div>
+      </article>
+
+      <article>
+        <header><h3>步骤 2 · create_scan</h3><span class="kind">MySQL 写入节点</span></header>
+        <div class="node-body">
+          <h4>节点输入</h4><pre>{
+  "cycle_code": "2026WW38",
+  "triggered_by": "manual",
+  "error": ""
+}</pre>
+          <h4>数据库操作</h4><pre>common.database.MySqlDatabase.connection()
+INSERT mrc_reporting_cycles ... ON DUPLICATE KEY UPDATE ...
+INSERT mrc_scan_runs (cycle_code, status, triggered_by)
+VALUES ('2026WW38', 'running', 'manual')</pre>
+          <h4>节点输出</h4><pre>{"scan_run_id": 42}</pre>
+          <h4>下一跳</h4><p><code>fetch_sharepoint</code>；数据库异常进入 <code>fail_scan</code>。</p>
+        </div>
+      </article>
+
+      <article>
+        <header><h3>步骤 3 · fetch_sharepoint</h3><span class="kind">SharePoint I/O 节点</span></header>
+        <div class="node-body">
+          <h4>节点输入</h4><pre>{"cycle_code":"2026WW38","scan_run_id":42}</pre>
+          <h4>处理</h4>
+          <ul>
+            <li>从独立 MRC <code>.env</code> 读取站点、证书和目录模板。</li>
+            <li>将 <code>{cycle_code}</code> 替换为 <code>2026WW38</code>。</li>
+            <li>忽略临时文件，只下载目录中的 <code>.xlsx</code>。</li>
+          </ul>
+          <h4>节点输出</h4><pre>{
+  "workbooks": ["&lt;WorkbookFile 1&gt;", "&lt;WorkbookFile 2&gt;"],
+  "files_found": 2
+}</pre>
+          <h4>下一跳</h4><p><code>parse_workbooks</code>；无 Excel 或请求失败进入 <code>fail_scan</code>。</p>
+        </div>
+      </article>
+
+      <article>
+        <header><h3>步骤 4 · parse_workbooks</h3><span class="kind">Excel 解析节点</span></header>
+        <div class="node-body">
+          <h4>节点输入</h4><pre>{
+  "workbooks": ["&lt;WorkbookFile 1&gt;", "&lt;WorkbookFile 2&gt;"],
+  "files_found": 2
+}</pre>
+          <h4>处理</h4>
+          <ul>
+            <li>只读取每个工作簿的第一个 Sheet。</li>
+            <li>在配置的前 N 行按表头定位，不依赖固定列字母。</li>
+            <li>识别 <code>Owner</code>、<code>Status Comments</code>、动态 <code>Platform:/Project:</code> 和 COR-SP 的目标 WW 列。</li>
+            <li>Owner 当前可保存人名；以后值变成邮箱会自动写入 <code>owner_email</code>。</li>
+            <li>按邮箱、团队、项目合并重复记录，优先保留非空状态。</li>
+          </ul>
+          <h4>节点输出</h4><pre>{"records":["&lt;ProjectRecord ...&gt;"]}</pre>
+          <h4>下一跳</h4><p><code>select_recipients</code>；格式或读取失败进入 <code>fail_scan</code>。</p>
+        </div>
+      </article>
+
+      <article>
+        <header><h3>步骤 5 · select_recipients</h3><span class="kind">确定性规则节点</span></header>
+        <div class="node-body">
+          <h4>节点输入</h4><pre>{
+  "reminder_type": "manual",
+  "records": ["&lt;ProjectRecord ...&gt;"]
+}</pre>
+          <h4>筛选规则</h4>
+          <ul>
+            <li><code>manual / tuesday / thursday</code>：保留全部解析记录。</li>
+            <li><code>monday</code>：只保留至少一个项目缺少 Comments 的邮箱及该邮箱的项目。</li>
+            <li>没有邮箱的记录仍会进入扫描快照，但不会成为邮件收件人。</li>
+          </ul>
+          <h4>节点输出</h4><pre>{"eligible_records":["&lt;ProjectRecord ...&gt;"]}</pre>
+          <h4>下一跳</h4><p><code>build_drafts</code>。</p>
+        </div>
+      </article>
+
+      <article>
+        <header><h3>步骤 6 · build_drafts</h3><span class="kind">邮件渲染节点</span></header>
+        <div class="node-body">
+          <h4>节点输入</h4><pre>{
+  "cycle_code": "2026WW38",
+  "scan_run_id": 42,
+  "reminder_type": "manual",
+  "eligible_records": ["&lt;ProjectRecord ...&gt;"]
+}</pre>
+          <h4>处理</h4>
+          <ul>
+            <li>按规范化邮箱分组，一位负责人一封邮件。</li>
+            <li>读取 <code>status_reminder_email.html</code> 并替换模板变量。</li>
+            <li>生成 Subject、HTML Body、项目数和幂等键。</li>
+          </ul>
+          <h4>节点输出</h4><pre>{
+  "drafts": [{
+    "owner_email": "owner@example.com",
+    "subject": "Action required: update project status for 2026WW38",
+    "project_count": 2,
+    "idempotency_key": "2026WW38:42:manual:owner@example.com"
+  }]
+}</pre>
+          <p class="note">当前节点只生成草稿，不调用邮件服务，也不会发送邮件。</p>
+          <h4>下一跳</h4><p><code>persist_snapshot</code>；模板读取失败进入 <code>fail_scan</code>。</p>
+        </div>
+      </article>
+
+      <article>
+        <header><h3>步骤 7 · persist_snapshot</h3><span class="kind">MySQL 事务节点</span></header>
+        <div class="node-body">
+          <h4>节点输入</h4><pre>{
+  "scan_run_id": 42,
+  "cycle_code": "2026WW38",
+  "records": ["&lt;ProjectRecord ...&gt;"],
+  "drafts": ["&lt;EmailDraft ...&gt;"],
+  "files_found": 2
+}</pre>
+          <h4>数据库操作</h4>
+          <ul>
+            <li>通过公共 <code>MySqlDatabase</code> 获取连接。</li>
+            <li>批量写入 <code>mrc_scan_items</code>。</li>
+            <li>批量写入状态为 draft 的 <code>mrc_email_deliveries</code>。</li>
+            <li>更新 <code>mrc_scan_runs</code> 为 succeeded 及统计字段。</li>
+            <li>更新 Reporting Cycle 的 latest scan。</li>
+            <li>全部操作在同一事务中提交，异常时回滚。</li>
+          </ul>
+          <h4>节点输出</h4><pre>{}</pre>
+          <h4>下一跳</h4><p class="success note"><code>END</code>。MrcService 随后向 Web 发送 completed SSE 事件。</p>
+        </div>
+      </article>
+
+      <article>
+        <header><h3>失败路径 · fail_scan</h3><span class="kind">统一失败收尾节点</span></header>
+        <div class="node-body">
+          <h4>节点输入</h4><pre>{
+  "scan_run_id": 42,
+  "error": "SharePoint scan failed: ..."
+}</pre>
+          <h4>处理</h4>
+          <ul>
+            <li>如果扫描记录已经创建，将其更新为 failed。</li>
+            <li>保存完成时间和截断后的错误信息。</li>
+            <li>如果失败发生在 create_scan 之前，则没有数据库记录需要更新。</li>
+          </ul>
+          <h4>节点输出</h4><pre>{"error":"SharePoint scan failed: ..."}</pre>
+          <h4>下一跳</h4><p><code>END</code>。MrcService 向 Web 发送 error SSE 事件。</p>
+        </div>
+      </article>
+
+      <article>
+        <header><h3>Web 与自动化开关</h3><span class="kind">LangGraph 外部控制</span></header>
+        <div class="node-body">
+          <h4>手动扫描</h4><pre>Web POST /api/agents/mrc-automation/scans
+  → MrcService 后台任务
+  → graph.invoke(...)
+  → progress / completed / error SSE</pre>
+          <h4>周期缓存</h4><pre>Web GET /api/agents/mrc-automation/cycles/{cycle_code}/latest
+  → MrcDatabase.get_latest_scan(...)
+  → 直接读取 MySQL，不运行 LangGraph</pre>
+          <h4>Enable Automation</h4><pre>Web PUT /api/agents/mrc-automation/automation
+  → MySQL mrc_automation_settings.enabled</pre>
+          <p class="note">当前 Enable Automation 只持久化开关并禁用手动控件；后台 Scheduler、自动判断 WW 和实际邮件发送尚未实现。</p>
+        </div>
+      </article>
+    </section>
+  </main>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "neutral",
+      flowchart: { curve: "basis", htmlLabels: true },
+      securityLevel: "loose"
+    });
+  </script>
+</body>
+</html>

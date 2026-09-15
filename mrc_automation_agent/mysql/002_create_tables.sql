@@ -1,20 +1,20 @@
 USE `webagent`;
 
-CREATE TABLE IF NOT EXISTS `automation_settings` (
+CREATE TABLE IF NOT EXISTS `mrc_automation_settings` (
     `id` TINYINT UNSIGNED NOT NULL,
     `enabled` BOOLEAN NOT NULL DEFAULT FALSE,
     `timezone` VARCHAR(64) NOT NULL DEFAULT 'UTC',
     `updated_at` TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
         ON UPDATE CURRENT_TIMESTAMP(6),
     PRIMARY KEY (`id`),
-    CONSTRAINT `chk_automation_settings_singleton` CHECK (`id` = 1)
+    CONSTRAINT `chk_mrc_automation_settings_singleton` CHECK (`id` = 1)
 ) ENGINE=InnoDB;
 
-INSERT INTO `automation_settings` (`id`, `enabled`)
+INSERT INTO `mrc_automation_settings` (`id`, `enabled`)
 VALUES (1, FALSE)
 ON DUPLICATE KEY UPDATE `id` = VALUES(`id`);
 
-CREATE TABLE IF NOT EXISTS `reporting_cycles` (
+CREATE TABLE IF NOT EXISTS `mrc_reporting_cycles` (
     `cycle_code` VARCHAR(10) NOT NULL,
     `latest_scan_id` BIGINT UNSIGNED NULL,
     `created_at` TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS `reporting_cycles` (
     PRIMARY KEY (`cycle_code`)
 ) ENGINE=InnoDB;
 
-CREATE TABLE IF NOT EXISTS `scan_runs` (
+CREATE TABLE IF NOT EXISTS `mrc_scan_runs` (
     `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     `cycle_code` VARCHAR(10) NOT NULL,
     `status` ENUM('queued', 'running', 'succeeded', 'failed') NOT NULL,
@@ -35,10 +35,10 @@ CREATE TABLE IF NOT EXISTS `scan_runs` (
     `missing_comments` INT UNSIGNED NOT NULL DEFAULT 0,
     `error_message` TEXT NULL,
     PRIMARY KEY (`id`),
-    KEY `idx_scan_runs_cycle_status_completed` (`cycle_code`, `status`, `completed_at`)
+    KEY `idx_mrc_scan_runs_cycle_status_completed` (`cycle_code`, `status`, `completed_at`)
 ) ENGINE=InnoDB;
 
-CREATE TABLE IF NOT EXISTS `scan_items` (
+CREATE TABLE IF NOT EXISTS `mrc_scan_items` (
     `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     `scan_run_id` BIGINT UNSIGNED NOT NULL,
     `workbook_name` VARCHAR(255) NOT NULL,
@@ -52,11 +52,11 @@ CREATE TABLE IF NOT EXISTS `scan_items` (
     `status_comments` TEXT NULL,
     `created_at` TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uq_scan_item_source` (`scan_run_id`, `workbook_name`, `sheet_name`, `source_row`),
-    KEY `idx_scan_items_owner` (`scan_run_id`, `owner_email`)
+    UNIQUE KEY `uq_mrc_scan_item_source` (`scan_run_id`, `workbook_name`, `sheet_name`, `source_row`),
+    KEY `idx_mrc_scan_items_owner` (`scan_run_id`, `owner_email`)
 ) ENGINE=InnoDB;
 
-CREATE TABLE IF NOT EXISTS `email_deliveries` (
+CREATE TABLE IF NOT EXISTS `mrc_email_deliveries` (
     `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     `cycle_code` VARCHAR(10) NOT NULL,
     `scan_run_id` BIGINT UNSIGNED NOT NULL,
@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS `email_deliveries` (
     `error_message` TEXT NULL,
     `created_at` TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uq_email_deliveries_idempotency` (`idempotency_key`),
-    KEY `idx_email_deliveries_cycle_status` (`cycle_code`, `status`),
-    KEY `idx_email_deliveries_run` (`scan_run_id`)
+    UNIQUE KEY `uq_mrc_email_deliveries_idempotency` (`idempotency_key`),
+    KEY `idx_mrc_email_deliveries_cycle_status` (`cycle_code`, `status`),
+    KEY `idx_mrc_email_deliveries_run` (`scan_run_id`)
 ) ENGINE=InnoDB;

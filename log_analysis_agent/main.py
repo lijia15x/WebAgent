@@ -6,7 +6,7 @@ from langchain_ollama import ChatOllama
 from dotenv import load_dotenv
 
 
-load_dotenv(Path(__file__).resolve().parent / ".env")
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 if __package__:
     from .agent.graph import create_agent_graph

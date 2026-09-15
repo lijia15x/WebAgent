@@ -56,15 +56,15 @@ class MrcService:
         return run if run and run.run_id == run_id else None
 
     async def get_automation_enabled(self) -> bool:
-        database = MrcDatabase(MrcConfig.from_env())
+        database = MrcDatabase()
         return await asyncio.to_thread(database.get_automation_enabled)
 
     async def set_automation_enabled(self, enabled: bool) -> None:
-        database = MrcDatabase(MrcConfig.from_env())
+        database = MrcDatabase()
         await asyncio.to_thread(database.set_automation_enabled, enabled)
 
     async def get_latest_scan(self, cycle_code: str) -> dict[str, Any] | None:
-        database = MrcDatabase(MrcConfig.from_env())
+        database = MrcDatabase()
         return await asyncio.to_thread(database.get_latest_scan, cycle_code)
 
     def _event(self, run: MrcRun, event: dict[str, Any]) -> dict[str, Any]:
@@ -88,7 +88,7 @@ class MrcService:
             config = MrcConfig.from_env()
             graph = create_mrc_graph(
                 config=config,
-                database=MrcDatabase(config),
+                database=MrcDatabase(),
                 sharepoint_client=SharePointClient(config),
                 on_event=emit,
             )

@@ -1,3 +1,4 @@
 -r log_analysis_agent/requirements.txt
 -r mrc_automation_agent/requirements.txt
 -r web/requirements.txt
+mysql-connector-python>=9.4,<10.0

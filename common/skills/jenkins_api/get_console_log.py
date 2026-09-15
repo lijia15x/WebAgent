@@ -18,7 +18,7 @@ def main() -> int:
         print(str(exc), file=sys.stderr)
         return 1
     sanitized_log = sanitize_log(log)
-    artifacts_dir = Path(__file__).resolve().parents[2] / "artifacts"
+    artifacts_dir = Path(__file__).resolve().parents[3] / "log_analysis_agent" / "artifacts"
     artifacts_dir.mkdir(exist_ok=True)
     with tempfile.NamedTemporaryFile(
         mode="w",
