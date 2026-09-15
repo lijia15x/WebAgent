@@ -15,7 +15,6 @@ langchain-ollama==1.1.0
 # MRC automation agent
 cryptography>=46.0,<47.0
 Office365-REST-Python-Client>=2.6,<3.0
-msal>=1.34,<2.0
 openpyxl>=3.1,<4.0
 python-pptx>=1.0,<2.0
 

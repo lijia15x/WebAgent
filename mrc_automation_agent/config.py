@@ -21,7 +21,10 @@ class MrcConfig:
     sharepoint_thumbprint: str
     sharepoint_certificate_path: str
     sharepoint_certificate_password: str
-    mail_sender: str = ""
+    smtp_sender_email: str = ""
+    smtp_sender_password: str = ""
+    smtp_server: str = ""
+    smtp_port: int = 587
     header_search_rows: int = 10
     ppt_model: str = "gpt-5.5"
 
@@ -37,7 +40,10 @@ class MrcConfig:
             sharepoint_certificate_password=os.getenv(
                 "MRC_SHAREPOINT_CERTIFICATE_PASSWORD", ""
             ),
-            mail_sender=os.getenv("MRC_MAIL_SENDER", ""),
+            smtp_sender_email=os.getenv("MRC_SMTP_SENDER_EMAIL", ""),
+            smtp_sender_password=os.getenv("MRC_SMTP_SENDER_PASSWORD", ""),
+            smtp_server=os.getenv("MRC_SMTP_SERVER", ""),
+            smtp_port=int(os.getenv("MRC_SMTP_PORT", "587")),
             header_search_rows=int(os.getenv("MRC_HEADER_SEARCH_ROWS", "10")),
             ppt_model=os.getenv("MRC_PPT_MODEL", "gpt-5.5"),
         )
@@ -56,8 +62,15 @@ class MrcConfig:
         )
 
     def require_mail(self) -> None:
-        self.require_sharepoint()
-        self._require({"MRC_MAIL_SENDER": self.mail_sender})
+        self._require(
+            {
+                "MRC_SMTP_SENDER_EMAIL": self.smtp_sender_email,
+                "MRC_SMTP_SENDER_PASSWORD": self.smtp_sender_password,
+                "MRC_SMTP_SERVER": self.smtp_server,
+            }
+        )
+        if not 1 <= self.smtp_port <= 65535:
+            raise ConfigurationError("MRC_SMTP_PORT must be between 1 and 65535")
 
     @staticmethod
     def _require(values: dict[str, str]) -> None:

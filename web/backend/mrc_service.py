@@ -11,7 +11,7 @@ from mrc_automation_agent.config import MrcConfig
 from mrc_automation_agent.database import MrcDatabase
 from mrc_automation_agent.graph import create_mrc_graph
 from mrc_automation_agent.models import EmailDraft
-from mrc_automation_agent.email_sender import GraphEmailSender
+from mrc_automation_agent.email_sender import SmtpEmailSender
 from mrc_automation_agent.ppt_generator import generate_weekly_ppts
 from mrc_automation_agent.sharepoint_client import SharePointClient
 
@@ -237,7 +237,7 @@ class MrcService:
             rows = await asyncio.to_thread(database.get_sendable_drafts, cycle_code, include_all)
             if not rows:
                 raise FileNotFoundError("No unsent recipients found; scan SharePoint first")
-            sender = GraphEmailSender(MrcConfig.from_env())
+            sender = SmtpEmailSender(MrcConfig.from_env())
             sent = 0
             failures = []
             for row in rows:

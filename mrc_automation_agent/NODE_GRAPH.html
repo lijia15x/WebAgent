@@ -402,7 +402,7 @@ VALUES ('2026WW38', 'running', 'manual')</pre>
             <h4>独立邮件操作</h4><pre>Web POST /api/agents/mrc-automation/cycles/{cycle_code}/mail
           → 从最近扫描快照读取草稿
           → All 或 Not Updated 收件人筛选
-          → Microsoft Graph sendMail
+          → SMTP AUTH + STARTTLS
           → 记录 sending / sent / failed</pre>
             <h4>独立 PPT 操作</h4><pre>Web POST /api/agents/mrc-automation/cycles/{cycle_code}/ppt
           → 只读取 workspace 中的当周 Excel
@@ -410,7 +410,7 @@ VALUES ('2026WW38', 'running', 'manual')</pre>
           → Copilot + 固定模板生成可下载 PPT</pre>
           <h4>Enable Automation</h4><pre>Web PUT /api/agents/mrc-automation/automation
   → MySQL mrc_automation_settings.enabled</pre>
-            <p class="note">当前 Enable Automation 只持久化开关，并在前后端禁用手动操作；后台 Scheduler 和自动判断 WW 尚未实现。手动 Send Mail 已接入 Microsoft Graph。</p>
+            <p class="note">当前 Enable Automation 只持久化开关，并在前后端禁用手动操作；后台 Scheduler 和自动判断 WW 尚未实现。手动 Send Mail 已接入 SMTP AUTH。</p>
         </div>
       </article>
     </section>

@@ -27,11 +27,10 @@ ignored by Git.
 analysis. `MRC_PPT_MODEL` independently controls the model used for MRC PPT
 generation.
 
-To enable **Send Mail**, set `MRC_MAIL_SENDER` to the sender mailbox. The Azure
-application configured by the existing MRC tenant, client ID, and PFX settings
-must have Microsoft Graph `Mail.Send` application permission with admin consent.
-The application can be restricted to approved mailboxes with an Exchange
-application access policy.
+To enable **Send Mail**, configure `MRC_SMTP_SENDER_EMAIL`,
+`MRC_SMTP_SENDER_PASSWORD`, `MRC_SMTP_SERVER`, and `MRC_SMTP_PORT`. The MRC
+service connects with SMTP AUTH, upgrades the connection using STARTTLS, and
+sends the generated HTML reminder through the authenticated mailbox.
 
 If MRC Automation will be used and its tables do not exist yet, install the
 MySQL command-line client, add `mysql` to `PATH`, and initialize the database

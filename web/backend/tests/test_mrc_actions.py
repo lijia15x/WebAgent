@@ -101,7 +101,7 @@ class MrcActionTests(unittest.IsolatedAsyncioTestCase):
         FakeDatabase.updates = []
         with (
             patch("web.backend.mrc_service.MrcDatabase", FakeDatabase),
-            patch("web.backend.mrc_service.GraphEmailSender") as sender_type,
+            patch("web.backend.mrc_service.SmtpEmailSender") as sender_type,
         ):
             sender_type.return_value.send = Mock()
             await service._run_mail(run, "2026WW38", False)
