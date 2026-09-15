@@ -33,8 +33,16 @@ class PptGeneratorTests(unittest.TestCase):
                 {
                     "title": "Engineering",
                     "paragraphs": [
-                        {"bold_lead": "Stable.", "normal_detail": "Milestones met."},
-                        {"bold_lead": "Watch.", "normal_detail": "Supplier timing."},
+                        {
+                            "bold_lead": "Stable.",
+                            "normal_detail": "Milestones met.",
+                            "source": "Status WW38!L12",
+                        },
+                        {
+                            "bold_lead": "Watch.",
+                            "normal_detail": "Supplier timing.",
+                            "source": "Status WW38!L18",
+                        },
                     ],
                 }
             ]
@@ -49,8 +57,18 @@ class PptGeneratorTests(unittest.TestCase):
             for path in (execution, tracking):
                 path.write_bytes(b"test")
             artifacts = [
-                MrcArtifact("excel", execution.name, execution.relative_to(workspace).as_posix()),
-                MrcArtifact("excel", tracking.name, tracking.relative_to(workspace).as_posix()),
+                MrcArtifact(
+                    "excel",
+                    execution.name,
+                    execution.relative_to(workspace).as_posix(),
+                    source_url="https://example.invalid/execution.xlsx?web=1",
+                ),
+                MrcArtifact(
+                    "excel",
+                    tracking.name,
+                    tracking.relative_to(workspace).as_posix(),
+                    source_url="https://example.invalid/tracking.xlsx?web=1",
+                ),
             ]
             with (
                 patch.object(ppt_generator, "WORKSPACE_ROOT", workspace),
@@ -75,10 +93,41 @@ class PptGeneratorTests(unittest.TestCase):
             self.assertEqual(tracking, copilot.call_args_list[2].args[2])
             self.assertIn('["Status WW38", "Lookup"]', copilot.call_args_list[0].args[0])
             self.assertIn('["AR tracking"]', copilot.call_args_list[2].args[0])
+            expected_source_urls = {
+                execution.name: "https://example.invalid/execution.xlsx?web=1",
+                tracking.name: "https://example.invalid/tracking.xlsx?web=1",
+            }
             for artifact in generated:
                 output = workspace / artifact.relative_path
                 self.assertTrue(output.is_file())
-                self.assertEqual(3, len(Presentation(output).slides))
+                presentation = Presentation(output)
+                self.assertEqual(3, len(presentation.slides))
+                hyperlinks = [
+                    run.hyperlink.address
+                    for shape in presentation.slides[2].shapes
+                    if getattr(shape, "has_text_frame", False)
+                    for paragraph in shape.text_frame.paragraphs
+                    for run in paragraph.runs
+                    if run.hyperlink.address
+                ]
+                self.assertEqual(2, len(hyperlinks))
+                self.assertTrue(
+                    hyperlinks[0].startswith(expected_source_urls[artifact.source_workbook_name])
+                )
+                self.assertIn("activeCell=Status%20WW38%21L12", hyperlinks[0])
+                self.assertIn("wdActiveCell=Status%20WW38%21L12", hyperlinks[0])
+
+    def test_source_link_opens_sharepoint_workbook_in_web_mode(self) -> None:
+        link = ppt_generator._source_link(
+            "https://example.invalid/MRC%20WW38.xlsx", "Status WW38!L12"
+        )
+
+        self.assertEqual(
+            "https://example.invalid/MRC%20WW38.xlsx?web=1"
+            "&activeCell=Status%20WW38%21L12"
+            "&wdActiveCell=Status%20WW38%21L12",
+            link,
+        )
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@ from typing import Any
 
 from common.database import MySqlDatabase
 
-from .models import EmailDraft, ProjectRecord
+from .models import EmailDraft, ProjectRecord, WorkbookFile
 
 
 class MrcDatabase:
@@ -46,6 +46,7 @@ class MrcDatabase:
         drafts: list[EmailDraft],
         files_found: int,
         reminder_type: str,
+        workbooks: list[WorkbookFile],
     ) -> None:
         owners = {record.owner_email for record in records if record.owner_email}
         missing_comments = sum(record.is_missing_update for record in records)
@@ -53,6 +54,29 @@ class MrcDatabase:
             cursor = connection.cursor()
             try:
                 connection.start_transaction()
+                cursor.executemany(
+                    """
+                    INSERT INTO mrc_scan_workbooks (
+                        cycle_code, workbook_name, workbook_url,
+                        latest_scan_run_id, modified_time
+                    ) VALUES (%s, %s, %s, %s, %s)
+                    ON DUPLICATE KEY UPDATE
+                        workbook_url = VALUES(workbook_url),
+                        latest_scan_run_id = VALUES(latest_scan_run_id),
+                        modified_time = VALUES(modified_time),
+                        updated_at = CURRENT_TIMESTAMP(6)
+                    """,
+                    [
+                        (
+                            cycle_code,
+                            workbook.name,
+                            workbook.source_url,
+                            scan_run_id,
+                            workbook.modified_time or None,
+                        )
+                        for workbook in workbooks
+                    ],
+                )
                 cursor.executemany(
                     """
                     INSERT INTO mrc_scan_items (
@@ -135,6 +159,25 @@ class MrcDatabase:
                     (message[:65535], scan_run_id),
                 )
                 connection.commit()
+            finally:
+                cursor.close()
+
+    def get_workbook_urls(self, cycle_code: str) -> dict[str, str]:
+        with self._database.connection() as connection:
+            cursor = connection.cursor(dictionary=True)
+            try:
+                cursor.execute(
+                    """
+                    SELECT workbook_name, workbook_url
+                    FROM mrc_scan_workbooks
+                    WHERE cycle_code = %s
+                    """,
+                    (cycle_code,),
+                )
+                return {
+                    str(row["workbook_name"]): str(row["workbook_url"])
+                    for row in cursor.fetchall()
+                }
             finally:
                 cursor.close()
 

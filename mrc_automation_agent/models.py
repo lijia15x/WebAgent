@@ -43,3 +43,4 @@ class MrcArtifact:
     relative_path: str
     source_workbook_name: str = ""
     modified_time: str = ""
+    source_url: str = ""

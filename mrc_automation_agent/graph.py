@@ -190,6 +190,7 @@ def create_mrc_graph(
                 state.get("drafts", []),
                 state.get("files_found", 0),
                 state["reminder_type"],
+                state.get("workbooks", []),
             )
             return {}
         except Exception as exc:

@@ -3,6 +3,7 @@ import json
 import re
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from openpyxl import load_workbook
 from pptx import Presentation
@@ -42,9 +43,12 @@ Identify the sheet or sheets containing the current execution status.
 Do not assume a fixed worksheet name, header row, or column position. Use headers and values to identify engineering
 groups, domains, status, risks, dates, and milestones for the requested week. Return only valid JSON with this schema:
 {{"sections":[{{"title":"engineering group","paragraphs":[
-{{"bold_lead":"synthesized conclusion","normal_detail":"supporting workbook facts"}}]}}]}}.
+{{"bold_lead":"synthesized conclusion","normal_detail":"supporting workbook facts",
+"source":"worksheet name!L12"}}]}}]}}.
 Include all major engineering groups with exactly 2 paragraphs each. Prioritize red, orange, and yellow risks,
-consolidate green progress, and keep all returned text within {max_chars} characters. No Markdown or code fences."""
+consolidate green progress, and keep all returned text within {max_chars} characters. For every paragraph, source must
+identify the most important original Excel evidence cell using the exact worksheet name and cell address. Prefer the
+current-week status cell. Do not include a URL in source. No Markdown or code fences."""
 
 
 def _parse_json_response(content: str) -> dict[str, Any]:
@@ -77,14 +81,23 @@ def _paragraphs(value: object, count: int | None = None) -> list[dict[str, str]]
             if isinstance(item, dict):
                 lead = str(item.get("bold_lead") or item.get("lead") or "").strip()
                 detail = str(item.get("normal_detail") or item.get("detail") or "").strip()
+                source = str(item.get("source") or item.get("reference") or "").strip()
             else:
-                lead, detail = str(item).strip(), ""
+                lead, detail, source = str(item).strip(), "", ""
             if lead or detail:
-                normalized.append({"bold_lead": lead, "normal_detail": detail})
+                normalized.append(
+                    {"bold_lead": lead, "normal_detail": detail, "source": source}
+                )
     if count is not None:
         normalized = normalized[:count]
         while len(normalized) < count:
-            normalized.append({"bold_lead": "No update available.", "normal_detail": ""})
+            normalized.append(
+                {
+                    "bold_lead": "No update available.",
+                    "normal_detail": "",
+                    "source": "",
+                }
+            )
     return normalized
 
 
@@ -97,7 +110,22 @@ def _prepare_text_frame(shape):
     return frame
 
 
-def _add_paragraph(frame, index: int, lead: str, detail: str = "", level: int = 0) -> int:
+def _source_link(source_url: str, source: str) -> str:
+    encoded_source = quote(source, safe="")
+    if "?" in source_url:
+        return f"{source_url}&activeCell={encoded_source}&wdActiveCell={encoded_source}"
+    return f"{source_url}?web=1&activeCell={encoded_source}&wdActiveCell={encoded_source}"
+
+
+def _add_paragraph(
+    frame,
+    index: int,
+    lead: str,
+    detail: str = "",
+    level: int = 0,
+    source: str = "",
+    source_url: str = "",
+) -> int:
     paragraph = frame.paragraphs[0] if index == 0 else frame.add_paragraph()
     paragraph.level = level
     paragraph.space_before = Pt(0 if index == 0 else 6)
@@ -109,10 +137,21 @@ def _add_paragraph(frame, index: int, lead: str, detail: str = "", level: int = 
             run.text = text
             run.font.size = Pt(SUMMARY_FONT_SIZE_PT)
             run.font.bold = bold
+    if source and source_url:
+        run = paragraph.add_run()
+        run.text = f" [{source}]"
+        run.font.size = Pt(SUMMARY_FONT_SIZE_PT)
+        run.font.underline = True
+        run.hyperlink.address = _source_link(source_url, source)
     return index + 1
 
 
-def _set_sections(shape, sections: list[dict[str, Any]], font_size: int = SUMMARY_FONT_SIZE_PT) -> None:
+def _set_sections(
+    shape,
+    sections: list[dict[str, Any]],
+    font_size: int = SUMMARY_FONT_SIZE_PT,
+    source_url: str = "",
+) -> None:
     frame = _prepare_text_frame(shape)
     index = 0
     for section in sections:
@@ -124,6 +163,8 @@ def _set_sections(shape, sections: list[dict[str, Any]], font_size: int = SUMMAR
                 index,
                 paragraph["bold_lead"],
                 paragraph["normal_detail"],
+                source=paragraph["source"],
+                source_url=source_url,
             )
     for paragraph in frame.paragraphs:
         for run in paragraph.runs:
@@ -176,7 +217,12 @@ def _update_presentation(
     if not page3_shapes:
         raise ValueError("PPT template slide 3 has no text area")
     sections = page3.get("sections")
-    _set_sections(page3_shapes[0], sections if isinstance(sections, list) else [], PAGE3_FONT_SIZE_PT)
+    _set_sections(
+        page3_shapes[0],
+        sections if isinstance(sections, list) else [],
+        PAGE3_FONT_SIZE_PT,
+        source_url=str(page3.get("source_url") or ""),
+    )
     presentation.save(str(output_path))
 
 
@@ -214,6 +260,7 @@ def generate_weekly_ppts(
             config.ppt_model,
             excel_path,
         )
+        page3["source_url"] = source.source_url
         output_path = output_dir / f"{excel_path.stem}_generated.pptx"
         _update_presentation(TEMPLATE_PATH, output_path, cycle_code, page2, page3)
         generated.append(register_ppt(cycle_code, output_path, source.file_name))

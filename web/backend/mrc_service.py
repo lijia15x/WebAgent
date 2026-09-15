@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote
@@ -199,6 +199,27 @@ class MrcService:
             excel_artifacts = [item for item in artifacts if item.kind == "excel"]
             if not excel_artifacts:
                 raise FileNotFoundError("Please scan SharePoint before generating PPTs")
+            database = MrcDatabase()
+            workbook_urls = await asyncio.to_thread(
+                database.get_workbook_urls, cycle_code
+            )
+            missing_urls = [
+                artifact.file_name
+                for artifact in excel_artifacts
+                if not workbook_urls.get(artifact.file_name)
+            ]
+            if missing_urls:
+                raise FileNotFoundError(
+                    "Workbook source URLs are missing; scan SharePoint again: "
+                    + ", ".join(missing_urls)
+                )
+            excel_artifacts = [
+                replace(
+                    artifact,
+                    source_url=workbook_urls[artifact.file_name],
+                )
+                for artifact in excel_artifacts
+            ]
             await run.events.put(self._event(run, {"type": "progress", "stage": "generate_ppt", "message": "Generating PPTs from local Excel files"}))
             generated = await asyncio.to_thread(
                 generate_weekly_ppts, MrcConfig.from_env(), cycle_code, excel_artifacts

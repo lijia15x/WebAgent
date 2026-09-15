@@ -40,6 +40,7 @@ once:
 ```powershell
 mysql -u root -p -e "source mrc_automation_agent/mysql/001_create_database.sql"
 mysql -u root -p webagent -e "source mrc_automation_agent/mysql/002_create_tables.sql"
+mysql -u root -p webagent -e "source mrc_automation_agent/mysql/003_create_scan_workbooks.sql"
 ```
 
 Start the Web application:

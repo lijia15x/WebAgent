@@ -2,12 +2,17 @@ import asyncio
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
+from mrc_automation_agent.models import MrcArtifact
 from web.backend.mrc_service import MrcBusyError, MrcRun, MrcService
 
 
 class FakeDatabase:
     rows = []
     updates = []
+    workbook_urls = {}
+
+    def get_workbook_urls(self, cycle_code):
+        return self.workbook_urls
 
     def get_sendable_drafts(self, cycle_code, include_all):
         return self.rows
@@ -33,6 +38,52 @@ class MrcActionTests(unittest.IsolatedAsyncioTestCase):
         event = await run.events.get()
         self.assertEqual("error", event["type"])
         self.assertIn("scan SharePoint", event["message"])
+
+    async def test_ppt_uses_workbook_urls_from_mysql(self) -> None:
+        service = MrcService()
+        run = MrcRun("run", asyncio.Queue())
+        artifact = MrcArtifact(
+            "excel", "MRC.xlsx", "2026WW38/excel/MRC.xlsx"
+        )
+        FakeDatabase.workbook_urls = {
+            "MRC.xlsx": "https://example.invalid/MRC.xlsx"
+        }
+        with (
+            patch("web.backend.mrc_service.list_cycle_artifacts", return_value=[artifact]),
+            patch("web.backend.mrc_service.MrcDatabase", FakeDatabase),
+            patch(
+                "web.backend.mrc_service.generate_weekly_ppts", return_value=[]
+            ) as generate,
+        ):
+            await service._run_ppt(run, "2026WW38")
+
+        events = []
+        while not run.events.empty():
+            events.append(await run.events.get())
+        self.assertEqual("completed", events[-1]["type"])
+        excel_artifacts = generate.call_args.args[2]
+        self.assertEqual(
+            "https://example.invalid/MRC.xlsx", excel_artifacts[0].source_url
+        )
+
+    async def test_ppt_requires_mysql_url_for_every_local_workbook(self) -> None:
+        service = MrcService()
+        run = MrcRun("run", asyncio.Queue())
+        artifact = MrcArtifact(
+            "excel", "MRC.xlsx", "2026WW38/excel/MRC.xlsx"
+        )
+        FakeDatabase.workbook_urls = {}
+        with (
+            patch("web.backend.mrc_service.list_cycle_artifacts", return_value=[artifact]),
+            patch("web.backend.mrc_service.MrcDatabase", FakeDatabase),
+            patch("web.backend.mrc_service.generate_weekly_ppts") as generate,
+        ):
+            await service._run_ppt(run, "2026WW38")
+
+        event = await run.events.get()
+        self.assertEqual("error", event["type"])
+        self.assertIn("scan SharePoint again", event["message"])
+        generate.assert_not_called()
 
     async def test_mail_sends_selected_database_drafts_and_updates_status(self) -> None:
         service = MrcService()

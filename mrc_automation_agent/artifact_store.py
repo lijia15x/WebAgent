@@ -40,6 +40,7 @@ def store_workbooks(
                 file_name=file_name,
                 relative_path=file_path.relative_to(WORKSPACE_ROOT).as_posix(),
                 modified_time=workbook.modified_time,
+                source_url=workbook.source_url,
             )
         )
     return artifacts
