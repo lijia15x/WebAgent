@@ -8,6 +8,23 @@ from mrc_automation_agent.models import WorkbookFile
 
 
 class ExcelParserTests(unittest.TestCase):
+    def test_accepts_status_comments_header_with_instructions(self) -> None:
+        excel = Workbook()
+        sheet = excel.active
+        sheet.append([None, "Platform:\nOKS-AP", "uPLC: Mid Design Entry", "Owner", "Status Comments\n(use this column for updates)"])
+        sheet.append([None, "Platform Health", "CPU Package Development", "Example Owner", "On track"])
+        content = BytesIO()
+        excel.save(content)
+
+        records = parse_workbook(
+            WorkbookFile("DMR Dashboard WW38'26.xlsx", "https://example.invalid/DMR.xlsx", content.getvalue()),
+            header_search_rows=10,
+        )
+
+        self.assertEqual(1, len(records))
+        self.assertEqual("CPU Package Development", records[0].project_name)
+        self.assertEqual("On track", records[0].status_comments)
+
     def test_finds_status_comments_by_header_in_column_l(self) -> None:
         excel = Workbook()
         sheet = excel.active

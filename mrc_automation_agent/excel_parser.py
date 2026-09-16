@@ -26,8 +26,10 @@ def _normalize_header(value: Any) -> str:
 
 def _header_name(value: Any) -> str | None:
     text = str(value or "").strip().lower()
-    if re.match(r"^(platform|project)\s*:", text):
+    if re.match(r"^(platform|project|uplc)\s*:", text):
         return "project_name"
+    if re.match(r"^status\s*comments?\b", text):
+        return "status_comments"
     normalized = _normalize_header(value)
     return next(
         (name for name, aliases in HEADER_ALIASES.items() if normalized in aliases),
