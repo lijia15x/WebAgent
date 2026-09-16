@@ -51,6 +51,8 @@ const translations = {
     taskCompleted: "任务已完成",
     taskFailed: "任务失败",
     finalResult: "Agent 已返回最终结果",
+    workingDetails: "正在执行…",
+    completedSteps: "已完成 {steps} 个步骤，耗时 {duration}",
     checkServerLog: "请检查服务端日志",
     requestNotSubmitted: "请求未能提交",
     progress: "Agent 进度",
@@ -163,6 +165,8 @@ const translations = {
     taskCompleted: "Task completed",
     taskFailed: "Task failed",
     finalResult: "The agent returned the final result",
+    workingDetails: "Working…",
+    completedSteps: "Completed {steps} steps in {duration}",
     checkServerLog: "Check the server log",
     requestNotSubmitted: "The request was not submitted",
     progress: "Agent progress",
@@ -255,6 +259,10 @@ let draftFilter = "all";
 let runState = "ready";
 let activitySequence = 0;
 let assistantBody;
+let processDetails;
+let processContent;
+let finalAnswer;
+let runStartedAt = 0;
 
 function t(key) {
   return translations[currentLanguage][key] || key;
@@ -682,6 +690,44 @@ function appendMessage(role, content) {
   return article.querySelector(".message-body");
 }
 
+function ensureProcessView() {
+  if (assistantBody) return;
+  assistantBody = appendMessage("assistant", "");
+  assistantBody.classList.add("streaming-answer");
+  processDetails = document.createElement("details");
+  processDetails.className = "process-details";
+  processDetails.open = true;
+  const summary = document.createElement("summary");
+  summary.textContent = t("workingDetails");
+  processContent = document.createElement("div");
+  processContent.className = "process-content";
+  processDetails.append(summary, processContent);
+  assistantBody.append(processDetails);
+}
+
+function completedProcessLabel() {
+  const elapsedSeconds = Math.max(0, (Date.now() - runStartedAt) / 1000);
+  const duration = elapsedSeconds < 10
+    ? `${elapsedSeconds.toFixed(1)}s`
+    : `${Math.round(elapsedSeconds)}s`;
+  return t("completedSteps")
+    .replace("{steps}", String(activitySequence))
+    .replace("{duration}", duration);
+}
+
+function beginFinalAnswer() {
+  if (finalAnswer) return;
+  if (!assistantBody) assistantBody = appendMessage("assistant", "");
+  if (processDetails) {
+    assistantBody.classList.remove("streaming-answer");
+    processDetails.open = false;
+    processDetails.querySelector("summary").textContent = completedProcessLabel();
+  }
+  finalAnswer = document.createElement("div");
+  finalAnswer.className = "final-answer";
+  assistantBody.append(finalAnswer);
+}
+
 function addActivity(title, detail = "") {
   activityList.querySelector(".activity-empty")?.remove();
   activitySequence += 1;
@@ -732,26 +778,38 @@ function handleAgentEvent(event) {
     case "copilot_activity":
       addActivity(t("copilotTool"), event.message);
       break;
+    case "process_delta":
+      ensureProcessView();
+      processContent.textContent += event.content || "";
+      conversation.scrollTo({ top: conversation.scrollHeight, behavior: "smooth" });
+      break;
     case "answer_delta":
-      if (!assistantBody) {
-        assistantBody = appendMessage("assistant", "");
-        assistantBody.classList.add("streaming-answer");
-      }
-      assistantBody.textContent += event.content || "";
+      beginFinalAnswer();
+      finalAnswer.textContent += event.content || "";
       conversation.scrollTo({ top: conversation.scrollHeight, behavior: "smooth" });
       break;
     case "completed":
-      if (!assistantBody) assistantBody = appendMessage("assistant", event.answer || t("taskDoneFallback"));
-      else assistantBody.textContent = event.answer || assistantBody.textContent;
       addActivity(t("generateAnalysis"), t("completed"));
+      if (!assistantBody) {
+        assistantBody = appendMessage("assistant", event.answer || t("taskDoneFallback"));
+      } else {
+        beginFinalAnswer();
+        finalAnswer.textContent = event.answer || t("taskDoneFallback");
+      }
       finishRun("completed", t("finalResult"));
       assistantBody = undefined;
+      processDetails = undefined;
+      processContent = undefined;
+      finalAnswer = undefined;
       break;
     case "error":
       appendMessage("assistant", event.message || t("agentFailed"));
       addActivity(t("executionFailed"), event.message || "Unknown error");
       finishRun("error", t("checkServerLog"));
       assistantBody = undefined;
+      processDetails = undefined;
+      processContent = undefined;
+      finalAnswer = undefined;
       break;
   }
 }
@@ -765,6 +823,10 @@ async function submitMessage() {
   input.style.height = "auto";
   setRunning(true);
   assistantBody = undefined;
+  processDetails = undefined;
+  processContent = undefined;
+  finalAnswer = undefined;
+  runStartedAt = Date.now();
   activitySequence = 0;
   activityList.innerHTML = "";
   document.querySelector("#runStrip").classList.remove("is-hidden");

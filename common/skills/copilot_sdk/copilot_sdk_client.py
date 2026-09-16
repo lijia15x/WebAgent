@@ -52,6 +52,7 @@ async def ask_copilot(
     workspace: Optional[Union[str, Path]] = None,
     timeout: float = 300.0,
     on_delta: Optional[Callable[[str], None]] = None,
+    on_process_delta: Optional[Callable[[str], None]] = None,
     on_activity: Optional[Callable[[str], None]] = None,
 ) -> str:
     try:
@@ -115,15 +116,26 @@ async def ask_copilot(
             working_directory=working_directory,
         )
         unsubscribe = None
-        if on_delta is not None or on_activity is not None:
+        if on_delta is not None or on_process_delta is not None or on_activity is not None:
             active_tools: dict[str, str] = {}
+            message_phases: dict[str, str] = {}
 
             def handle_event(event) -> None:
                 data = event.data
-                if on_delta is not None and isinstance(
+                if isinstance(data, events_module.AssistantMessageStartData):
+                    message_phases[data.message_id] = (data.phase or "").lower()
+                elif on_process_delta is not None and isinstance(
+                    data, events_module.AssistantReasoningDeltaData
+                ):
+                    on_process_delta(data.delta_content)
+                elif on_delta is not None and isinstance(
                     data, events_module.AssistantMessageDeltaData
                 ):
-                    on_delta(data.delta_content)
+                    phase = message_phases.get(data.message_id, "")
+                    if phase in {"analysis", "reasoning"} and on_process_delta is not None:
+                        on_process_delta(data.delta_content)
+                    else:
+                        on_delta(data.delta_content)
                 elif on_activity is not None and isinstance(
                     data, events_module.ToolExecutionStartData
                 ):
