@@ -34,6 +34,9 @@ PAGE2_PROMPT = """You are preparing slide 2 of an executive summary PPT from the
 The workbook contains these worksheets: {sheet_names}.
 Analyze the sheet or sheets containing execution status for {cycle_code}.
 Do not assume a fixed worksheet name. Ignore administrative, lookup, and instruction sheets unless needed for context.
+When the workbook has Platform and Engineering Domain columns, treat Platform as the engineering group classification
+and Engineering Domain as the project or domain within that group. Carry merged or blank Platform cells down to the
+following Engineering Domain rows until the next non-empty Platform value.
 Return only valid JSON with this schema:
 {{"executive_summary":[{{"bold_lead":"judgment","normal_detail":"supporting facts"}}],
 "detail_sections":[{{"title":"engineering group","paragraphs":[{{"bold_lead":"judgment","normal_detail":"supporting facts"}}]}}]}}.
@@ -46,6 +49,8 @@ The workbook contains these worksheets: {sheet_names}.
 Identify the sheet or sheets containing the current execution status.
 Do not assume a fixed worksheet name, header row, or column position. Use headers and values to identify engineering
 groups, domains, status, risks, dates, and milestones for the requested week. Return only valid JSON with this schema:
+When Platform and Engineering Domain columns are present, organize sections by Platform and describe the Engineering
+Domain rows within each Platform. Carry merged or blank Platform cells down until the next non-empty Platform value.
 {{"sections":[{{"title":"engineering group","paragraphs":[
 {{"bold_lead":"synthesized conclusion","normal_detail":"supporting workbook facts",
 "source":"worksheet name!L12"}}]}}]}}.

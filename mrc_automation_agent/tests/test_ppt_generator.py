@@ -11,6 +11,11 @@ from mrc_automation_agent.models import MrcArtifact
 
 
 class PptGeneratorTests(unittest.TestCase):
+    def test_prompts_preserve_platform_and_engineering_domain_hierarchy(self) -> None:
+        self.assertIn("treat Platform as the engineering group", ppt_generator.PAGE2_PROMPT)
+        self.assertIn("Engineering Domain as the project", ppt_generator.PAGE2_PROMPT)
+        self.assertIn("organize sections by Platform", ppt_generator.PAGE3_PROMPT)
+
     def test_copilot_call_does_not_inherit_log_analysis_workspace(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             excel_path = Path(directory) / "status.xlsx"

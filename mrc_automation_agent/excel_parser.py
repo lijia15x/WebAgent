@@ -26,7 +26,9 @@ def _normalize_header(value: Any) -> str:
 
 def _header_name(value: Any) -> str | None:
     text = str(value or "").strip().lower()
-    if re.match(r"^(platform|project|uplc)\s*:", text):
+    if re.match(r"^platform\s*:", text):
+        return "platform"
+    if re.match(r"^(project|uplc)\s*:", text):
         return "project_name"
     if re.match(r"^status\s*comments?\b", text):
         return "status_comments"
@@ -61,6 +63,12 @@ def _find_headers(
                 rf"^WW\s*0?{re.escape(target_week)}(?:\D|$)", text, re.IGNORECASE
             ):
                 columns["status_comments"] = column
+        platform_column = columns.get("platform")
+        if platform_column is not None:
+            if "project_name" in columns:
+                columns.setdefault("function_team", platform_column)
+            else:
+                columns["project_name"] = platform_column
         has_owner = "owner_name" in columns or "owner_email" in columns
         if REQUIRED_HEADERS.issubset(columns) and has_owner:
             return row_number, columns
@@ -86,6 +94,7 @@ def parse_workbook(workbook: WorkbookFile, header_search_rows: int) -> list[Proj
             except WorkbookFormatError:
                 continue
             parsed_sheet = True
+            current_function_team = ""
             for source_row, values in enumerate(
                 worksheet.iter_rows(min_row=header_row + 1, values_only=True),
                 start=header_row + 1,
@@ -99,6 +108,9 @@ def parse_workbook(workbook: WorkbookFile, header_search_rows: int) -> list[Proj
                 project_name = value("project_name")
                 if not project_name:
                     continue
+                function_team = value("function_team")
+                if function_team:
+                    current_function_team = function_team
                 owner_name = value("owner_name")
                 owner_email = value("owner_email").lower()
                 if not owner_email and EMAIL_PATTERN.fullmatch(owner_name):
@@ -110,7 +122,7 @@ def parse_workbook(workbook: WorkbookFile, header_search_rows: int) -> list[Proj
                         workbook_url=workbook.source_url,
                         sheet_name=worksheet.title,
                         source_row=source_row,
-                        function_team=value("function_team"),
+                        function_team=current_function_team,
                         project_name=project_name,
                         owner_name=owner_name,
                         owner_email=owner_email,

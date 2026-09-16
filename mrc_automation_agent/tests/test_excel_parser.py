@@ -8,6 +8,26 @@ from mrc_automation_agent.models import WorkbookFile
 
 
 class ExcelParserTests(unittest.TestCase):
+    def test_uses_platform_as_group_for_engineering_domains(self) -> None:
+        excel = Workbook()
+        sheet = excel.active
+        sheet.append(["Platform:\nOKS - RS", "Engineering Domain", "Owner", "Status Comments"])
+        sheet.append(["Data Center Component Engineering", "Signal Integrity", "Owner One", "On track"])
+        sheet.append([None, "Power Integrity", "Owner Two", "Watch"])
+        content = BytesIO()
+        excel.save(content)
+
+        records = parse_workbook(
+            WorkbookFile("DMR-RS WW40.xlsx", "https://example.invalid/DMR-RS.xlsx", content.getvalue()),
+            header_search_rows=10,
+        )
+
+        self.assertEqual(["Signal Integrity", "Power Integrity"], [record.project_name for record in records])
+        self.assertEqual(
+            ["Data Center Component Engineering", "Data Center Component Engineering"],
+            [record.function_team for record in records],
+        )
+
     def test_accepts_engineering_domain_as_project_header(self) -> None:
         excel = Workbook()
         sheet = excel.active
@@ -39,6 +59,7 @@ class ExcelParserTests(unittest.TestCase):
 
         self.assertEqual(1, len(records))
         self.assertEqual("CPU Package Development", records[0].project_name)
+        self.assertEqual("Platform Health", records[0].function_team)
         self.assertEqual("On track", records[0].status_comments)
 
     def test_finds_status_comments_by_header_in_column_l(self) -> None:
@@ -87,6 +108,8 @@ class ExcelParserTests(unittest.TestCase):
         )
 
         self.assertEqual(1, len(records))
+        self.assertEqual("Project A", records[0].project_name)
+        self.assertEqual("", records[0].function_team)
         self.assertEqual("Example Owner", records[0].owner_name)
         self.assertEqual("", records[0].owner_email)
 
