@@ -79,7 +79,8 @@ async def ask_copilot(
             }
         )
 
-    workspace = workspace or os.getenv("COPILOT_WORKSPACE_ROOT")
+    if workspace is None:
+        workspace = os.getenv("COPILOT_WORKSPACE_ROOT")
     working_directory = None
     if workspace:
         resolved_workspace = Path(workspace).resolve()

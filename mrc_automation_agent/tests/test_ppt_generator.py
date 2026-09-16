@@ -1,7 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from pptx import Presentation
 
@@ -11,6 +11,22 @@ from mrc_automation_agent.models import MrcArtifact
 
 
 class PptGeneratorTests(unittest.TestCase):
+    def test_copilot_call_does_not_inherit_log_analysis_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            excel_path = Path(directory) / "status.xlsx"
+            excel_path.write_bytes(b"test")
+            copilot = AsyncMock(return_value='{"executive_summary": []}')
+
+            with patch.object(ppt_generator, "ask_copilot", copilot):
+                ppt_generator._call_copilot_json("Analyze workbook", "gpt-5.5", excel_path)
+
+            copilot.assert_awaited_once_with(
+                "Analyze workbook",
+                model="gpt-5.5",
+                files=[excel_path],
+                workspace="",
+            )
+
     def test_generates_one_presentation_for_each_workbook(self) -> None:
         config = MrcConfig(
             sharepoint_site_url="",
@@ -102,6 +118,42 @@ class PptGeneratorTests(unittest.TestCase):
                 self.assertTrue(output.is_file())
                 presentation = Presentation(output)
                 self.assertEqual(3, len(presentation.slides))
+                page2_text_shapes = [
+                    shape
+                    for shape in presentation.slides[1].shapes
+                    if getattr(shape, "has_text_frame", False)
+                ]
+                self.assertIn(
+                    "Platform Dashboard –WW38 2026",
+                    [shape.text for shape in page2_text_shapes],
+                )
+                dashboard_shape = next(
+                    shape
+                    for shape in page2_text_shapes
+                    if shape.text.startswith("Platform Dashboard")
+                )
+                self.assertEqual(
+                    32.0,
+                    dashboard_shape.text_frame.paragraphs[0].runs[0].font.size.pt,
+                )
+                self.assertEqual(
+                    ["WW38'26", "WW34'26", "WW30'26", "WW26'26", "WW22'26"],
+                    [shape.text for shape in page2_text_shapes if shape.text.startswith("WW")],
+                )
+                self.assertTrue(
+                    all(
+                        shape.text_frame.paragraphs[0].runs[0].font.size.pt == 8.0
+                        for shape in page2_text_shapes
+                        if shape.text.startswith("WW")
+                    )
+                )
+                detail_shapes = [
+                    shape
+                    for shape in page2_text_shapes
+                    if shape.left == ppt_generator.PAGE2_DETAIL_TEXTBOX_LEFT
+                    and shape.top == ppt_generator.PAGE2_DETAIL_TEXTBOX_TOP
+                ]
+                self.assertEqual(1, len(detail_shapes))
                 hyperlinks = [
                     run.hyperlink.address
                     for shape in presentation.slides[2].shapes

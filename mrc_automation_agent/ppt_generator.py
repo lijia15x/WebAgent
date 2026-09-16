@@ -20,6 +20,10 @@ from .models import MrcArtifact
 SUMMARY_FONT_SIZE_PT = 10
 PAGE3_FONT_SIZE_PT = 10
 PAGE3_MAX_CHAR_COUNT = 4900
+PAGE2_DETAIL_TEXTBOX_LEFT = 588135
+PAGE2_DETAIL_TEXTBOX_TOP = 2871854
+PAGE2_DETAIL_TEXTBOX_WIDTH = 11168038
+PAGE2_DETAIL_TEXTBOX_HEIGHT = 2808461
 TEMPLATE_PATH = (
     Path(__file__).resolve().parent
     / "templates"
@@ -62,7 +66,9 @@ def _parse_json_response(content: str) -> dict[str, Any]:
 
 
 def _call_copilot_json(prompt: str, model: str, excel_path: Path) -> dict[str, Any]:
-    content = asyncio.run(ask_copilot(prompt, model=model, files=[excel_path]))
+    content = asyncio.run(
+        ask_copilot(prompt, model=model, files=[excel_path], workspace="")
+    )
     return _parse_json_response(content)
 
 
@@ -175,11 +181,93 @@ def _text_shapes(slide) -> list[Any]:
     return [shape for shape in slide.shapes if getattr(shape, "has_text_frame", False)]
 
 
-def _replace_week_tokens(slide, cycle_code: str) -> None:
-    label = f"WW{cycle_code[-2:]} {cycle_code[:4]}"
+def _first_font_size(shape):
+    for paragraph in shape.text_frame.paragraphs:
+        for run in paragraph.runs:
+            if run.font.size is not None:
+                return run.font.size
+    return None
+
+
+def _set_text_preserving_font_size(shape, text: str) -> None:
+    font_size = _first_font_size(shape)
+    shape.text = text
+    if font_size is not None:
+        for paragraph in shape.text_frame.paragraphs:
+            for run in paragraph.runs:
+                run.font.size = font_size
+
+
+def _replace_week_tokens(slide, label: str) -> None:
     for shape in _text_shapes(slide):
         if shape.text and re.search(r"(?i)WW\s*\d{1,2}", shape.text):
-            shape.text = re.sub(r"(?i)WW\s*\d{1,2}(?:[' -]?\d{2,4})?", label, shape.text)
+            _set_text_preserving_font_size(
+                shape,
+                re.sub(
+                    r"(?i)WW\s*\d{1,2}(?:\s*[‘']?\s*\d{2,4})?",
+                    label,
+                    shape.text,
+                ),
+            )
+
+
+def _week_labels(cycle_code: str, count: int = 5, step: int = 4) -> list[str]:
+    week = int(cycle_code[-2:])
+    year = int(cycle_code[2:4])
+    labels = []
+    for _ in range(count):
+        labels.append(f"WW{week:02d}'{year:02d}")
+        week -= step
+        while week < 1:
+            week += 52
+            year -= 1
+    return labels
+
+
+def _update_page2(slide, cycle_code: str, page2: dict[str, Any]) -> None:
+    long_text_shapes = []
+    week_labels = iter(_week_labels(cycle_code))
+    dashboard_label = f"WW{cycle_code[-2:]} {cycle_code[:4]}"
+    for shape in _text_shapes(slide):
+        text = (shape.text or "").strip()
+        if not text:
+            continue
+        if re.search(r"(?i)platform\s+dashboard", text):
+            _replace_week_tokens_for_shape(shape, dashboard_label)
+        elif re.match(r"(?i)^WW\s*\d{1,2}", text):
+            _set_text_preserving_font_size(shape, next(week_labels, text))
+        elif len(text) > 80:
+            long_text_shapes.append(shape)
+
+    if not long_text_shapes:
+        raise ValueError("PPT template slide 2 has no summary text area")
+    summary = _paragraphs(page2.get("executive_summary"), count=2)
+    _set_sections(long_text_shapes[0], [{"title": "Executive Summary", "paragraphs": summary}])
+
+    details = page2.get("detail_sections")
+    if isinstance(details, list):
+        detail_shape = (
+            long_text_shapes[1]
+            if len(long_text_shapes) > 1
+            else slide.shapes.add_textbox(
+                PAGE2_DETAIL_TEXTBOX_LEFT,
+                PAGE2_DETAIL_TEXTBOX_TOP,
+                PAGE2_DETAIL_TEXTBOX_WIDTH,
+                PAGE2_DETAIL_TEXTBOX_HEIGHT,
+            )
+        )
+        _set_sections(detail_shape, details[:2])
+
+
+def _replace_week_tokens_for_shape(shape, label: str) -> None:
+    _set_text_preserving_font_size(
+        shape,
+        re.sub(
+            r"(?i)WW\s*\d{1,2}(?:\s*[‘']?\s*\d{2,4})?",
+            label,
+            shape.text,
+        ),
+    )
 
 
 def _update_presentation(
@@ -197,19 +285,10 @@ def _update_presentation(
     if len(presentation.slides) < 3:
         raise ValueError("PPT template must contain at least three slides")
 
-    for slide in list(presentation.slides)[:3]:
-        _replace_week_tokens(slide, cycle_code)
-
-    page2_shapes = sorted(
-        _text_shapes(presentation.slides[1]), key=lambda shape: len(shape.text or ""), reverse=True
-    )
-    if not page2_shapes:
-        raise ValueError("PPT template slide 2 has no text area")
-    summary = _paragraphs(page2.get("executive_summary"), count=2)
-    _set_sections(page2_shapes[0], [{"title": "Executive Summary", "paragraphs": summary}])
-    details = page2.get("detail_sections")
-    if isinstance(details, list) and len(page2_shapes) > 1:
-        _set_sections(page2_shapes[1], details[:2])
+    dashboard_label = f"WW{cycle_code[-2:]} {cycle_code[:4]}"
+    _replace_week_tokens(presentation.slides[0], dashboard_label)
+    _update_page2(presentation.slides[1], cycle_code, page2)
+    _replace_week_tokens(presentation.slides[2], dashboard_label)
 
     page3_shapes = sorted(
         _text_shapes(presentation.slides[2]), key=lambda shape: len(shape.text or ""), reverse=True

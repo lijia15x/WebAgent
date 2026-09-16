@@ -8,6 +8,22 @@ from mrc_automation_agent.models import WorkbookFile
 
 
 class ExcelParserTests(unittest.TestCase):
+    def test_accepts_engineering_domain_as_project_header(self) -> None:
+        excel = Workbook()
+        sheet = excel.active
+        sheet.append(["Engineering Domain", "Owner", "Status Comments"])
+        sheet.append(["Signal Integrity", "Example Owner", "On track"])
+        content = BytesIO()
+        excel.save(content)
+
+        records = parse_workbook(
+            WorkbookFile("DMR-RS WW40.xlsx", "https://example.invalid/DMR-RS.xlsx", content.getvalue()),
+            header_search_rows=10,
+        )
+
+        self.assertEqual(1, len(records))
+        self.assertEqual("Signal Integrity", records[0].project_name)
+
     def test_accepts_status_comments_header_with_instructions(self) -> None:
         excel = Workbook()
         sheet = excel.active

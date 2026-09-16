@@ -11,7 +11,7 @@ class WorkbookFormatError(ValueError):
 
 HEADER_ALIASES = {
     "function_team": {"functionteam", "group", "team"},
-    "project_name": {"project", "projectname"},
+    "project_name": {"engineeringdomain", "project", "projectname"},
     "owner_name": {"owner", "ownername", "projectowner"},
     "owner_email": {"owneremail", "projectowneremail", "email"},
     "status_comments": {"comments", "statuscomment", "statuscomments"},
