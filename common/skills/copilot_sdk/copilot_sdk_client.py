@@ -6,6 +6,14 @@ from pathlib import Path
 from typing import Callable, Optional, Sequence, Union
 
 
+PROCESS_PHASES = frozenset({"analysis", "reasoning"})
+ANSWER_PHASES = frozenset({"answer", "final", "response"})
+
+
+def _message_is_process(phase: str | None, has_tool_requests: bool) -> bool:
+    return (phase or "").lower() in PROCESS_PHASES or has_tool_requests
+
+
 def _format_tool_start(tool_name: str, arguments, working_directory: str | None) -> str:
     message = f"Started tool: {tool_name}"
     if tool_name not in {"glob", "rg", "view"} or arguments is None:
@@ -119,23 +127,53 @@ async def ask_copilot(
         if on_delta is not None or on_process_delta is not None or on_activity is not None:
             active_tools: dict[str, str] = {}
             message_phases: dict[str, str] = {}
+            pending_messages: dict[str, list[str]] = {}
+            streamed_messages: set[str] = set()
+
+            def emit_process(content: str) -> None:
+                if content and on_process_delta is not None:
+                    on_process_delta(content)
+
+            def emit_answer(content: str) -> None:
+                if content and on_delta is not None:
+                    on_delta(content)
 
             def handle_event(event) -> None:
                 data = event.data
                 if isinstance(data, events_module.AssistantMessageStartData):
                     message_phases[data.message_id] = (data.phase or "").lower()
-                elif on_process_delta is not None and isinstance(
+                elif isinstance(data, events_module.AssistantIntentData):
+                    emit_process(f"{data.intent}\n")
+                elif isinstance(
                     data, events_module.AssistantReasoningDeltaData
                 ):
-                    on_process_delta(data.delta_content)
-                elif on_delta is not None and isinstance(
+                    emit_process(data.delta_content)
+                elif isinstance(
                     data, events_module.AssistantMessageDeltaData
                 ):
                     phase = message_phases.get(data.message_id, "")
-                    if phase in {"analysis", "reasoning"} and on_process_delta is not None:
-                        on_process_delta(data.delta_content)
+                    if phase in PROCESS_PHASES:
+                        streamed_messages.add(data.message_id)
+                        emit_process(data.delta_content)
+                    elif phase in ANSWER_PHASES:
+                        streamed_messages.add(data.message_id)
+                        emit_answer(data.delta_content)
                     else:
-                        on_delta(data.delta_content)
+                        pending_messages.setdefault(data.message_id, []).append(
+                            data.delta_content
+                        )
+                elif isinstance(data, events_module.AssistantMessageData):
+                    message_id = data.message_id
+                    phase = data.phase or message_phases.get(message_id, "")
+                    buffered = "".join(pending_messages.pop(message_id, []))
+                    if message_id not in streamed_messages:
+                        content = buffered or data.content
+                        if _message_is_process(phase, bool(data.tool_requests)):
+                            emit_process(content)
+                        else:
+                            emit_answer(content)
+                    message_phases.pop(message_id, None)
+                    streamed_messages.discard(message_id)
                 elif on_activity is not None and isinstance(
                     data, events_module.ToolExecutionStartData
                 ):
@@ -171,6 +209,13 @@ async def ask_copilot(
         content = getattr(getattr(response, "data", None), "content", None)
         if not content:
             raise RuntimeError("Copilot SDK returned an empty response.")
+        if on_delta is not None or on_process_delta is not None:
+            for chunks in pending_messages.values():
+                buffered = "".join(chunks)
+                if buffered == content:
+                    emit_answer(buffered)
+                else:
+                    emit_process(buffered)
         return content
     finally:
         await client.stop()
