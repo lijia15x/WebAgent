@@ -145,12 +145,12 @@ SHOW VARIABLES LIKE 'collation_server';
 sudo docker exec -it mysql mysql -uroot -p
 ```
 
-仅允许指定电脑登录。将 `192.168.10.50` 替换为电脑的内网 IP：
+仅允许指定电脑登录。将 `192.168.10.50` 替换%（%为允许所有）为电脑的内网 IP：
 
 ```sql
-CREATE USER 'root'@'192.168.10.50' IDENTIFIED BY '替换为高强度密码';
-GRANT ALL PRIVILEGES ON *.* TO 'root'@'192.168.10.50' WITH GRANT OPTION;
-SHOW GRANTS FOR 'root'@'192.168.10.50';
+ALTER USER 'root'@'%' IDENTIFIED BY '新的高强度密码';
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
+SHOW GRANTS FOR 'root'@'%';
 ```
 
 如果该账号已经存在，改用：
