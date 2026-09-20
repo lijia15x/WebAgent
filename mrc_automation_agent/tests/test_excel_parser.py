@@ -62,6 +62,24 @@ class ExcelParserTests(unittest.TestCase):
         self.assertEqual("Platform Health", records[0].function_team)
         self.assertEqual("On track", records[0].status_comments)
 
+    def test_uses_current_week_status_instead_of_history(self) -> None:
+        excel = Workbook()
+        sheet = excel.active
+        sheet.append([None, None, None, None])
+        sheet.append([None, None, "WW40'26", "WW39'26"])
+        sheet.append(["Engineering Domain", "Owner", "Status Comments", "Status Comments"])
+        sheet.append(["Signal Integrity", "owner@example.com", "", "Historical update"])
+        content = BytesIO()
+        excel.save(content)
+
+        records = parse_workbook(
+            WorkbookFile("DMR-RS WW40.xlsx", "https://example.invalid/DMR-RS.xlsx", content.getvalue()),
+            header_search_rows=10,
+        )
+
+        self.assertEqual("", records[0].status_comments)
+        self.assertTrue(records[0].is_missing_update)
+
     def test_finds_status_comments_by_header_in_column_l(self) -> None:
         excel = Workbook()
         sheet = excel.active
@@ -128,6 +146,31 @@ class ExcelParserTests(unittest.TestCase):
 
         self.assertEqual("", records[0].owner_name)
         self.assertEqual("owner@example.com", records[0].owner_email)
+
+    def test_expands_multiple_emails_from_owner_column(self) -> None:
+        excel = Workbook()
+        sheet = excel.active
+        sheet.append(["Project: Example", "Owner", "Status Comments"])
+        sheet.append(
+            [
+                "Project A",
+                "first@example.com; second@example.com / third@example.com",
+                "",
+            ]
+        )
+        content = BytesIO()
+        excel.save(content)
+
+        records = parse_workbook(
+            WorkbookFile("MRC.xlsx", "https://example.invalid/MRC.xlsx", content.getvalue()),
+            header_search_rows=5,
+        )
+
+        self.assertEqual(
+            ["first@example.com", "second@example.com", "third@example.com"],
+            [record.owner_email for record in records],
+        )
+        self.assertTrue(all(record.owner_name == "" for record in records))
 
     def test_uses_target_week_column_for_cor_workbook(self) -> None:
         excel = Workbook()

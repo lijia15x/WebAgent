@@ -18,6 +18,12 @@ HEADER_ALIASES = {
 }
 REQUIRED_HEADERS = {"project_name", "status_comments"}
 EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+EMAIL_SEPARATOR_PATTERN = re.compile(r"[\s,;/]+")
+
+
+def _email_addresses(value: str) -> list[str]:
+    parts = [part.lower() for part in EMAIL_SEPARATOR_PATTERN.split(value.strip()) if part]
+    return parts if parts and all(EMAIL_PATTERN.fullmatch(part) for part in parts) else []
 
 
 def _normalize_header(value: Any) -> str:
@@ -56,7 +62,23 @@ def _find_headers(
         for column, value in enumerate(row):
             name = _header_name(value)
             if name is not None:
-                columns[name] = column
+                if name == "status_comments":
+                    parent_headers = (
+                        worksheet.cell(row=parent_row, column=column + 1).value
+                        for parent_row in range(1, row_number)
+                    )
+                    is_target_week = target_week and any(
+                        re.match(
+                            rf"^WW\s*0?{re.escape(target_week)}(?:\D|$)",
+                            str(parent_header or "").strip(),
+                            re.IGNORECASE,
+                        )
+                        for parent_header in parent_headers
+                    )
+                    if is_target_week or "status_comments" not in columns:
+                        columns[name] = column
+                else:
+                    columns[name] = column
                 continue
             text = str(value or "").strip()
             if target_week and re.match(
@@ -112,23 +134,25 @@ def parse_workbook(workbook: WorkbookFile, header_search_rows: int) -> list[Proj
                 if function_team:
                     current_function_team = function_team
                 owner_name = value("owner_name")
-                owner_email = value("owner_email").lower()
-                if not owner_email and EMAIL_PATTERN.fullmatch(owner_name):
-                    owner_email = owner_name.lower()
+                owner_emails = _email_addresses(value("owner_email"))
+                if not owner_emails:
+                    owner_emails = _email_addresses(owner_name)
+                if owner_emails and not value("owner_email"):
                     owner_name = ""
-                records.append(
-                    ProjectRecord(
-                        workbook_name=workbook.name,
-                        workbook_url=workbook.source_url,
-                        sheet_name=worksheet.title,
-                        source_row=source_row,
-                        function_team=current_function_team,
-                        project_name=project_name,
-                        owner_name=owner_name,
-                        owner_email=owner_email,
-                        status_comments=value("status_comments"),
+                for owner_email in owner_emails or [""]:
+                    records.append(
+                        ProjectRecord(
+                            workbook_name=workbook.name,
+                            workbook_url=workbook.source_url,
+                            sheet_name=worksheet.title,
+                            source_row=source_row,
+                            function_team=current_function_team,
+                            project_name=project_name,
+                            owner_name=owner_name,
+                            owner_email=owner_email,
+                            status_comments=value("status_comments"),
+                        )
                     )
-                )
         if not parsed_sheet:
             raise WorkbookFormatError(
                 f"Could not find a supported worksheet in {workbook.name}"

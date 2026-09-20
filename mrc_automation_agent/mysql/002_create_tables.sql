@@ -67,7 +67,10 @@ CREATE TABLE IF NOT EXISTS `mrc_scan_items` (
     `status_comments` TEXT NULL,
     `created_at` TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uq_mrc_scan_item_source` (`scan_run_id`, `workbook_name`, `sheet_name`, `source_row`),
+    UNIQUE KEY `uq_mrc_scan_item_source` (
+        `scan_run_id`, `workbook_name`(160), `sheet_name`(160),
+        `source_row`, `owner_email`(191)
+    ),
     KEY `idx_mrc_scan_items_owner` (`scan_run_id`, `owner_email`)
 ) ENGINE=InnoDB;
 
