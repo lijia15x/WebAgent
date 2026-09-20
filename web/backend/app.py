@@ -25,6 +25,14 @@ class MrcMailRequest(BaseModel):
     include_all: bool = False
 
 
+class MrcTestMailRequest(BaseModel):
+    recipient_email: str = Field(
+        min_length=3,
+        max_length=320,
+        pattern=r"^[^\s@]+@[^\s@]+\.[^\s@]+$",
+    )
+
+
 class AutomationRequest(BaseModel):
     enabled: bool
 
@@ -83,6 +91,20 @@ async def generate_mrc_ppt(cycle_code: str) -> dict:
 async def send_mrc_mail(cycle_code: str, request: MrcMailRequest) -> dict:
     try:
         run_id = await mrc_service.submit_mail(cycle_code, request.include_all)
+    except MrcBusyError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"run_id": run_id, "status": "running"}
+
+
+@app.post(
+    "/api/agents/mrc-automation/cycles/{cycle_code}/test-mail",
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def send_mrc_test_mail(cycle_code: str, request: MrcTestMailRequest) -> dict:
+    try:
+        run_id = await mrc_service.submit_test_mail(
+            cycle_code, request.recipient_email
+        )
     except MrcBusyError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return {"run_id": run_id, "status": "running"}

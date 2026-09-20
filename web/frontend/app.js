@@ -87,6 +87,14 @@ const translations = {
     snapshotLoadFailed: "无法加载已保存的扫描",
     scanSharePoint: "扫描 SharePoint",
     sendMail: "发送邮件",
+    sendTestMail: "测试邮件",
+    recipientEmail: "收件邮箱",
+    recipientEmailPlaceholder: "name@example.com",
+    testMailHint: "使用所选报告周期中第一个未填写负责人的邮件内容。",
+    cancel: "取消",
+    confirmSend: "发送",
+    testMailStarted: "测试邮件发送任务已启动",
+    testMailCompleted: "测试邮件已发送",
     generatePpt: "生成 PPT",
     allOwnersOption: "全部",
     notUpdated: "未填写",
@@ -201,6 +209,14 @@ const translations = {
     snapshotLoadFailed: "Unable to load the saved scan",
     scanSharePoint: "Scan SharePoint",
     sendMail: "Send Mail",
+    sendTestMail: "Test Mail",
+    recipientEmail: "Recipient email",
+    recipientEmailPlaceholder: "name@example.com",
+    testMailHint: "Uses the first owner with a missing update in the selected reporting cycle.",
+    cancel: "Cancel",
+    confirmSend: "Send",
+    testMailStarted: "Test mail delivery started",
+    testMailCompleted: "Test mail sent",
     generatePpt: "Generate PPT",
     allOwnersOption: "All",
     notUpdated: "Not Updated",
@@ -304,7 +320,7 @@ function showToast(message) {
   toast.textContent = message;
   toast.classList.add("is-visible");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove("is-visible"), 2400);
+  toastTimer = setTimeout(() => toast.classList.remove("is-visible"), 5000);
 }
 
 function updateAutomationControls() {
@@ -319,6 +335,7 @@ function updateAutomationControls() {
   document.querySelector("#previousWeek").disabled = automationEnabled || mrcScanRunning;
   document.querySelector("#nextWeek").disabled = automationEnabled || mrcScanRunning;
   document.querySelector("#sendMail").disabled = automationEnabled || mrcScanRunning;
+  document.querySelector("#sendTestMail").disabled = automationEnabled || mrcScanRunning;
   document.querySelector("#sendAll").disabled = automationEnabled || mrcScanRunning;
   document.querySelector("#generatePpt").disabled = automationEnabled || mrcScanRunning;
   document.querySelector("#openTemplate").disabled = automationEnabled || mrcScanRunning;
@@ -476,6 +493,8 @@ async function runMrcAction(endpoint, body, startedMessage) {
         loadMrcSnapshot(cycleCode);
         if (event.operation === "mail") {
           showToast(`${t("mailCompleted")}: ${event.sent} sent, ${event.failed} failed`);
+        } else if (event.operation === "test_mail") {
+          showToast(`${t("testMailCompleted")}: ${event.recipient}`);
         } else if (event.operation === "ppt") {
           showToast(t("pptCompleted"));
         } else {
@@ -521,6 +540,15 @@ function sendMrcMail() {
     `/api/agents/mrc-automation/cycles/${cycleCode}/mail`,
     { include_all: document.querySelector("#sendAll").checked },
     t("mailStarted"),
+  );
+}
+
+function sendMrcTestMail(recipientEmail) {
+  const cycleCode = document.querySelector("#targetWeek").textContent;
+  return runMrcAction(
+    `/api/agents/mrc-automation/cycles/${cycleCode}/test-mail`,
+    { recipient_email: recipientEmail },
+    t("testMailStarted"),
   );
 }
 
@@ -610,6 +638,13 @@ document.querySelector("#automationToggle").addEventListener("click", async () =
 });
 document.querySelector("#scanPreview").addEventListener("click", runMrcScan);
 document.querySelector("#sendMail").addEventListener("click", sendMrcMail);
+document.querySelector("#sendTestMail").addEventListener("click", () => {
+  const dialog = document.querySelector("#testMailDialog");
+  const recipient = document.querySelector("#testMailRecipient");
+  recipient.value = "";
+  dialog.showModal();
+  recipient.focus();
+});
 document.querySelector("#generatePpt").addEventListener("click", generateMrcPpt);
 document.querySelectorAll("[data-draft-filter]").forEach(button => {
   button.addEventListener("click", () => {
@@ -623,6 +658,15 @@ document.querySelector("#openTemplate").addEventListener("click", () => {
   document.querySelector("#emailDialog").showModal();
 });
 document.querySelector("#closeEmailDialog").addEventListener("click", () => document.querySelector("#emailDialog").close());
+document.querySelector("#closeTestMailDialog").addEventListener("click", () => document.querySelector("#testMailDialog").close());
+document.querySelector("#cancelTestMail").addEventListener("click", () => document.querySelector("#testMailDialog").close());
+document.querySelector("#testMailForm").addEventListener("submit", event => {
+  event.preventDefault();
+  const recipient = document.querySelector("#testMailRecipient");
+  if (!recipient.reportValidity()) return;
+  document.querySelector("#testMailDialog").close();
+  sendMrcTestMail(recipient.value.trim());
+});
 
 const draftSamples = [
   { owner: "Alex", email: "alex.kim@example.com", projects: [["Core Platform", "Atlas Migration"], ["Core Platform", "Runtime Refresh"]] },

@@ -66,6 +66,10 @@ class MrcService:
         await self._require_manual_actions()
         return await self._submit(self._run_mail, cycle_code, include_all)
 
+    async def submit_test_mail(self, cycle_code: str, recipient_email: str) -> str:
+        await self._require_manual_actions()
+        return await self._submit(self._run_test_mail, cycle_code, recipient_email)
+
     async def _require_manual_actions(self) -> None:
         if await self.get_automation_enabled():
             raise MrcBusyError("Automation is enabled; manual actions are disabled")
@@ -257,6 +261,61 @@ class MrcService:
             await run.events.put(self._event(run, {"type": "completed", "operation": "mail", "sent": sent, "failed": len(failures), "failed_recipients": failures}))
         except Exception as exc:
             await run.events.put(self._event(run, {"type": "error", "message": str(exc)}))
+        finally:
+            if sender is not None:
+                sender.close()
+            self._status = "idle"
+
+    async def _run_test_mail(
+        self, run: MrcRun, cycle_code: str, recipient_email: str
+    ) -> None:
+        sender = None
+        try:
+            database = MrcDatabase()
+            row = await asyncio.to_thread(
+                database.get_first_missing_draft, cycle_code
+            )
+            if row is None:
+                raise FileNotFoundError(
+                    "No recipient with a missing update found; scan SharePoint first"
+                )
+            draft = EmailDraft(
+                row.get("owner_name", ""),
+                recipient_email,
+                row["subject"],
+                row["body_html"],
+                row.get("project_count", 0),
+                "",
+            )
+            await run.events.put(
+                self._event(
+                    run,
+                    {
+                        "type": "progress",
+                        "stage": "send_test_mail",
+                        "message": f"Sending test reminder to {recipient_email}",
+                    },
+                )
+            )
+            sender = SmtpEmailSender(MrcConfig.from_env())
+            await asyncio.to_thread(sender.send, draft)
+            await run.events.put(
+                self._event(
+                    run,
+                    {
+                        "type": "completed",
+                        "operation": "test_mail",
+                        "sent": 1,
+                        "failed": 0,
+                        "recipient": recipient_email,
+                        "source_owner_email": row["owner_email"],
+                    },
+                )
+            )
+        except Exception as exc:
+            await run.events.put(
+                self._event(run, {"type": "error", "message": str(exc)})
+            )
         finally:
             if sender is not None:
                 sender.close()

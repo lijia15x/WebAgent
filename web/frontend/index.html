@@ -88,6 +88,7 @@
           <button class="automation-button" type="button" id="automationToggle" aria-pressed="false"><span class="automation-indicator" aria-hidden="true"></span><span data-i18n="enableAutomation">Enable automation</span></button>
           <button class="sync-button" type="button" id="scanPreview"><span aria-hidden="true">↻</span><span data-i18n="scanSharePoint">Scan SharePoint</span></button>
           <div class="mail-action"><label><input type="checkbox" id="sendAll"><span data-i18n="allOwnersOption">All</span></label><button class="action-button" type="button" id="sendMail"><span data-i18n="sendMail">Send Mail</span></button></div>
+          <button class="action-button" type="button" id="sendTestMail"><span data-i18n="sendTestMail">Test Mail</span></button>
           <button class="action-button" type="button" id="generatePpt"><span data-i18n="generatePpt">Generate PPT</span></button>
         </div>
 
@@ -159,6 +160,20 @@
   <dialog class="email-dialog" id="emailDialog">
     <header><strong data-i18n="emailPreview">Email preview</strong><button class="icon-button" type="button" id="closeEmailDialog" aria-label="Close" data-i18n-aria="close">×</button></header>
     <div class="email-dialog-body" id="emailDialogBody"></div>
+  </dialog>
+  <dialog class="test-mail-dialog" id="testMailDialog">
+    <form id="testMailForm">
+      <header><strong data-i18n="sendTestMail">Test Mail</strong><button class="icon-button" type="button" id="closeTestMailDialog" aria-label="Close" data-i18n-aria="close">×</button></header>
+      <div class="test-mail-dialog-body">
+        <label for="testMailRecipient" data-i18n="recipientEmail">Recipient email</label>
+        <input id="testMailRecipient" name="recipient_email" type="email" maxlength="320" autocomplete="email" required data-i18n-placeholder="recipientEmailPlaceholder">
+        <p data-i18n="testMailHint">Uses the first owner with a missing update in the selected reporting cycle.</p>
+      </div>
+      <footer>
+        <button class="quiet-button" type="button" id="cancelTestMail" data-i18n="cancel">Cancel</button>
+        <button class="sync-button" type="submit" data-i18n="confirmSend">Send</button>
+      </footer>
+    </form>
   </dialog>
   <div class="toast" id="toast" role="status"></div>
   <script src="./app.js"></script>

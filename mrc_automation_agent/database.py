@@ -272,6 +272,40 @@ class MrcDatabase:
             and (include_all or draft["missing_updates"] > 0)
         ]
 
+    def get_first_missing_draft(self, cycle_code: str) -> dict[str, Any] | None:
+        scan = self.get_latest_scan(cycle_code)
+        if scan is None:
+            return None
+        with self._database.connection() as connection:
+            cursor = connection.cursor(dictionary=True)
+            try:
+                cursor.execute(
+                    """
+                    SELECT owner_email
+                    FROM mrc_scan_items
+                    WHERE scan_run_id = %s
+                      AND owner_email IS NOT NULL
+                      AND TRIM(owner_email) <> ''
+                      AND (status_comments IS NULL OR TRIM(status_comments) = '')
+                    ORDER BY workbook_name, sheet_name, source_row, id
+                    LIMIT 1
+                    """,
+                    (scan["id"],),
+                )
+                item = cursor.fetchone()
+            finally:
+                cursor.close()
+        if item is None:
+            return None
+        return next(
+            (
+                draft
+                for draft in scan["drafts"]
+                if draft["owner_email"] == item["owner_email"]
+            ),
+            None,
+        )
+
     def update_delivery_status(
         self, scan_run_id: int, owner_email: str, status: str, error_message: str | None = None
     ) -> None:

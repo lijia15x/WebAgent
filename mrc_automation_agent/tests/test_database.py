@@ -1,5 +1,6 @@
 import unittest
 from contextlib import contextmanager
+from unittest.mock import Mock
 
 from mrc_automation_agent.database import MrcDatabase
 
@@ -22,6 +23,9 @@ class FakeCursor:
 
     def fetchall(self):
         return self.rows
+
+    def fetchone(self):
+        return self.rows[0] if self.rows else None
 
     def close(self) -> None:
         pass
@@ -126,6 +130,29 @@ class MrcDatabaseTests(unittest.TestCase):
             parameters,
         )
         self.assertTrue(shared_database.connection_instance.committed)
+
+    def test_get_first_missing_draft_uses_source_order(self) -> None:
+        shared_database = FakeMySqlDatabase()
+        cursor = shared_database.connection_instance.cursor_instance
+        cursor.rows = [{"owner_email": "first@example.com"}]
+        database = MrcDatabase(shared_database)
+        expected = {
+            "owner_email": "first@example.com",
+            "subject": "Reminder",
+            "body_html": "<p>First owner</p>",
+        }
+        database.get_latest_scan = Mock(
+            return_value={"id": 17, "drafts": [expected]}
+        )
+
+        result = database.get_first_missing_draft("2026WW38")
+
+        self.assertIs(expected, result)
+        statement = cursor.statements[-1]
+        self.assertIn("status_comments IS NULL", statement)
+        self.assertIn(
+            "ORDER BY workbook_name, sheet_name, source_row, id", statement
+        )
 
 
 if __name__ == "__main__":

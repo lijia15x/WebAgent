@@ -8,6 +8,7 @@ from web.backend.mrc_service import MrcBusyError, MrcRun, MrcService
 
 class FakeDatabase:
     rows = []
+    first_missing = None
     updates = []
     workbook_urls = {}
 
@@ -16,6 +17,9 @@ class FakeDatabase:
 
     def get_sendable_drafts(self, cycle_code, include_all):
         return self.rows
+
+    def get_first_missing_draft(self, cycle_code):
+        return self.first_missing
 
     def update_delivery_status(self, *arguments):
         self.updates.append(arguments)
@@ -113,6 +117,38 @@ class MrcActionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(1, events[-1]["sent"])
         self.assertEqual((42, "alex@example.com", "sending"), FakeDatabase.updates[0])
         self.assertEqual((42, "alex@example.com", "sent"), FakeDatabase.updates[1])
+
+    async def test_test_mail_overrides_only_recipient_and_skips_status_update(self) -> None:
+        service = MrcService()
+        run = MrcRun("run", asyncio.Queue())
+        FakeDatabase.first_missing = {
+            "scan_run_id": 42,
+            "owner_name": "Alex",
+            "owner_email": "alex@example.com",
+            "subject": "Reminder",
+            "body_html": "<p>Alex project</p>",
+            "project_count": 2,
+        }
+        FakeDatabase.updates = []
+        with (
+            patch("web.backend.mrc_service.MrcDatabase", FakeDatabase),
+            patch("web.backend.mrc_service.SmtpEmailSender") as sender_type,
+        ):
+            sender_type.return_value.send = Mock()
+            await service._run_test_mail(
+                run, "2026WW38", "reviewer@example.com"
+            )
+
+        sent_draft = sender_type.return_value.send.call_args.args[0]
+        self.assertEqual("reviewer@example.com", sent_draft.owner_email)
+        self.assertEqual("Alex", sent_draft.owner_name)
+        self.assertEqual("<p>Alex project</p>", sent_draft.body_html)
+        self.assertEqual([], FakeDatabase.updates)
+        events = []
+        while not run.events.empty():
+            events.append(await run.events.get())
+        self.assertEqual("test_mail", events[-1]["operation"])
+        self.assertEqual("alex@example.com", events[-1]["source_owner_email"])
 
 
 if __name__ == "__main__":
