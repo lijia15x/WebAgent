@@ -1,8 +1,16 @@
 from io import BytesIO
-from urllib.parse import urljoin
+from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
 from .config import MrcConfig
 from .models import WorkbookFile
+
+
+def _excel_web_url(site_url: str, server_relative_url: str) -> str:
+    file_url = urljoin(site_url, server_relative_url)
+    parts = urlsplit(file_url)
+    query = dict(parse_qsl(parts.query, keep_blank_values=True))
+    query["web"] = "1"
+    return urlunsplit(parts._replace(query=urlencode(query)))
 
 
 class SharePointClient:
@@ -48,7 +56,7 @@ class SharePointClient:
                 continue
             content = BytesIO()
             file.download(content).execute_query()
-            source_url = urljoin(
+            source_url = _excel_web_url(
                 self._config.sharepoint_site_url,
                 str(file.properties.get("ServerRelativeUrl", "")),
             )
