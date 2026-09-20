@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project Status Reminder</title>
+    <title>MRC Status Reminder</title>
 </head>
 <body style="margin:0; padding:0; background-color:#f4f6f8; font-family:Arial, Helvetica, sans-serif; color:#1f2933;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f4f6f8; padding:24px 0;">
@@ -12,18 +12,24 @@
                 <table role="presentation" width="640" cellspacing="0" cellpadding="0" border="0" style="width:640px; max-width:94%; background-color:#ffffff; border:1px solid #d9e2ec; border-radius:8px; overflow:hidden;">
                     <tr>
                         <td style="background-color:#0f766e; padding:22px 28px; color:#ffffff;">
-                            <div style="font-size:13px; line-height:18px; opacity:0.9;">Project status reminder</div>
-                            <div style="font-size:22px; line-height:30px; font-weight:700; margin-top:4px;">Please update the project status.</div>
+                            <div style="font-size:13px; line-height:18px; opacity:0.9;">MRC status reminder</div>
+                            <div style="font-size:22px; line-height:30px; font-weight:700; margin-top:4px;">Action Required: update the "{{MRC_PROJECT}}" MRC status.</div>
                         </td>
                     </tr>
                     <tr>
                         <td style="padding:28px;">
                             <p style="font-size:15px; line-height:24px; margin:0 0 16px 0;">Hi, {{OWNER}}</p>
                             <p style="font-size:15px; line-height:24px; margin:0 0 16px 0;">
-                                You are receiving this mail because you are the owner of <strong>{{FUNCTION_TEAM}}</strong> function team of <strong>{{PROJECT_NAME}}</strong> project.
+                                As the owner of the <strong>{{PROJECT_NAME}}</strong> function team for the <strong>{{MRC_PROJECT}}</strong> project, please update the status in {{EXCEL_LINKS}}.
+                            </p>
+                            <p style="font-size:15px; line-height:24px; margin:0 0 16px 0;">
+                                Your update is needed for the upcoming DHE MRC meeting.
+                            </p>
+                            <p style="font-size:15px; line-height:24px; margin:0 0 16px 0;">
+                                If you have already completed the update, please disregard this email.
                             </p>
                             <p style="font-size:15px; line-height:24px; margin:0 0 22px 0;">
-                                Please update the project status in the following workbook(s) so that we can generate the project status review:<br>{{EXCEL_LINKS}}
+                                Thank you for your cooperation.
                             </p>
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                                 <tr>
@@ -33,7 +39,7 @@
                             <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px 0;">
                                 <tr>
                                     <td style="background-color:#0f766e; border-radius:6px;">
-                                        <a href="{{EXCEL_LINK}}" style="display:inline-block; padding:11px 18px; color:#f0f0f5; font-size:14px; font-weight:700; text-decoration:none;">Go to update</a>
+                                        <a href="{{EXCEL_LINK}}" style="display:inline-block; padding:11px 18px; color:#f0f0f5; font-size:14px; font-weight:700; text-decoration:none;">Click Here to Update Status</a>
                                     </td>
                                 </tr>
                             </table>
