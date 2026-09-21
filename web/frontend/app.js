@@ -119,6 +119,9 @@ const translations = {
     recipients: "收件人",
     draftQueue: "草稿队列",
     drafts: "封草稿",
+    draftQueuePages: "草稿队列分页",
+    previousPage: "上一页",
+    nextPage: "下一页",
     dataQuality: "数据质量",
     dataQualityDetail: "跳过 1 行：负责人邮箱缺失。重复项目行已合并。",
     emailPreview: "邮件预览",
@@ -241,6 +244,9 @@ const translations = {
     recipients: "Recipients",
     draftQueue: "Draft queue",
     drafts: "drafts",
+    draftQueuePages: "Draft queue pages",
+    previousPage: "Previous page",
+    nextPage: "Next page",
     dataQuality: "Data quality",
     dataQualityDetail: "1 row skipped: missing owner email. Duplicate project rows were merged.",
     emailPreview: "Email preview",
@@ -272,6 +278,8 @@ let automationEnabled = false;
 let mrcScanRunning = false;
 let currentMrcDrafts = [];
 let draftFilter = "all";
+let currentDraftPage = 1;
+const draftsPerPage = 10;
 let runState = "ready";
 let activitySequence = 0;
 let assistantBody;
@@ -342,6 +350,12 @@ function updateAutomationControls() {
   document.querySelectorAll("[data-draft-filter]").forEach(button => {
     button.disabled = automationEnabled || mrcScanRunning;
   });
+  const visibleDraftCount = draftFilter === "missing"
+    ? currentMrcDrafts.filter(draft => Number(draft.missing_updates || 0) > 0).length
+    : currentMrcDrafts.length;
+  const pageCount = Math.max(1, Math.ceil(visibleDraftCount / draftsPerPage));
+  document.querySelector("#previousDraftPage").disabled = automationEnabled || mrcScanRunning || currentDraftPage === 1;
+  document.querySelector("#nextDraftPage").disabled = automationEnabled || mrcScanRunning || currentDraftPage === pageCount;
 }
 
 function renderArtifacts(artifacts) {
@@ -374,7 +388,14 @@ function renderDraftQueue() {
   const drafts = draftFilter === "missing"
     ? currentMrcDrafts.filter(draft => Number(draft.missing_updates || 0) > 0)
     : currentMrcDrafts;
+  const pageCount = Math.max(1, Math.ceil(drafts.length / draftsPerPage));
+  currentDraftPage = Math.min(currentDraftPage, pageCount);
+  const pageDrafts = drafts.slice((currentDraftPage - 1) * draftsPerPage, currentDraftPage * draftsPerPage);
   document.querySelector("#draftCount").textContent = drafts.length;
+  document.querySelector("#draftPagination").classList.toggle("is-hidden", pageCount <= 1);
+  document.querySelector("#draftPageStatus").textContent = `${currentDraftPage} / ${pageCount}`;
+  document.querySelector("#previousDraftPage").disabled = currentDraftPage === 1 || automationEnabled || mrcScanRunning;
+  document.querySelector("#nextDraftPage").disabled = currentDraftPage === pageCount || automationEnabled || mrcScanRunning;
   const draftList = document.querySelector("#draftList");
   draftList.replaceChildren();
   if (!drafts.length) {
@@ -387,7 +408,7 @@ function renderDraftQueue() {
     document.querySelector("#emailCanvas").replaceChildren();
     return;
   }
-  drafts.forEach((draft, index) => {
+  pageDrafts.forEach((draft, index) => {
     const row = document.createElement("button");
     row.className = `draft-row${index === 0 ? " is-selected" : ""}`;
     row.type = "button";
@@ -409,7 +430,7 @@ function renderDraftQueue() {
     row.addEventListener("click", () => selectMrcDraft(draft, row));
     draftList.append(row);
   });
-  if (drafts[0]) selectMrcDraft(drafts[0], draftList.firstElementChild);
+  if (pageDrafts[0]) selectMrcDraft(pageDrafts[0], draftList.firstElementChild);
 }
 
 function applyMrcSnapshot(snapshot) {
@@ -421,6 +442,7 @@ function applyMrcSnapshot(snapshot) {
   }
   renderArtifacts(snapshot.artifacts || []);
   currentMrcDrafts = snapshot.drafts || [];
+  currentDraftPage = 1;
   renderDraftQueue();
 }
 
@@ -650,9 +672,18 @@ document.querySelector("#generatePpt").addEventListener("click", generateMrcPpt)
 document.querySelectorAll("[data-draft-filter]").forEach(button => {
   button.addEventListener("click", () => {
     draftFilter = button.dataset.draftFilter;
+    currentDraftPage = 1;
     document.querySelectorAll("[data-draft-filter]").forEach(item => item.classList.toggle("is-active", item === button));
     renderDraftQueue();
   });
+});
+document.querySelector("#previousDraftPage").addEventListener("click", () => {
+  currentDraftPage -= 1;
+  renderDraftQueue();
+});
+document.querySelector("#nextDraftPage").addEventListener("click", () => {
+  currentDraftPage += 1;
+  renderDraftQueue();
 });
 document.querySelector("#openTemplate").addEventListener("click", () => {
   document.querySelector("#emailDialogBody").innerHTML = document.querySelector(".email-canvas").outerHTML;

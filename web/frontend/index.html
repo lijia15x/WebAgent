@@ -126,6 +126,11 @@
                 <button class="draft-row" type="button" data-draft="1"><span class="owner-mark">MS</span><span><strong>maya.singh@example.com</strong><small>Data Systems · Metrics Hub</small></span><b>1</b></button>
                 <button class="draft-row" type="button" data-draft="2"><span class="owner-mark">JL</span><span><strong>jordan.lee@example.com</strong><small>Validation · Falcon CI</small></span><b>1</b></button>
               </div>
+              <nav class="draft-pagination is-hidden" id="draftPagination" aria-label="Draft queue pages" data-i18n-aria="draftQueuePages">
+                <button class="icon-button" type="button" id="previousDraftPage" aria-label="Previous page" data-i18n-aria="previousPage">‹</button>
+                <span id="draftPageStatus">1 / 1</span>
+                <button class="icon-button" type="button" id="nextDraftPage" aria-label="Next page" data-i18n-aria="nextPage">›</button>
+              </nav>
               <div class="data-note"><span>!</span><p><strong data-i18n="dataQuality">Data quality</strong><small data-i18n="dataQualityDetail">1 row skipped: missing owner email. Duplicate project rows were merged.</small></p></div>
             </section>
 
