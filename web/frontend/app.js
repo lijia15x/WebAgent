@@ -598,6 +598,7 @@ function setAgent(id) {
   contentGrid.classList.toggle("is-hidden", isMrc);
   composerWrap.classList.toggle("is-hidden", isMrc);
   mrcWorkspace.classList.toggle("is-hidden", !isMrc);
+  document.querySelector("#clearButton").classList.toggle("is-hidden", isMrc);
   document.querySelector("#activityToggle").classList.toggle("is-hidden", isMrc);
   document.querySelector("#runStrip").classList.add("is-hidden");
   sendButton.disabled = !agent.ready || isRunning || isMrc;
