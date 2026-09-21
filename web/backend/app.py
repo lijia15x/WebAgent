@@ -40,6 +40,16 @@ class AutomationRequest(BaseModel):
 app = FastAPI(title="Agent Desk", version="0.1.0")
 
 
+@app.middleware("http")
+async def disable_frontend_cache(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path == "/" or request.url.path.endswith(
+        (".html", ".js", ".css")
+    ):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.get("/api/agents")
 async def list_agents() -> list[dict]:
     return [
