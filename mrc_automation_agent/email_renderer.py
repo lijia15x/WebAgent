@@ -9,6 +9,15 @@ from .models import EmailDraft, ProjectRecord
 TEMPLATE_PATH = Path(__file__).with_name("templates") / "status_reminder_email.html"
 
 
+def _owner_display_name(owner_name: str, owner_email: str) -> str:
+    display_name = owner_name or owner_email
+    if "@" not in display_name:
+        return display_name
+    local_part = display_name.split("@", 1)[0]
+    words = re.split(r"[._-]+", local_part)
+    return " ".join(word[:1].upper() + word[1:].lower() for word in words if word)
+
+
 def _mrc_project_name(workbook_name: str) -> str:
     name = Path(workbook_name).stem
     name = re.sub(r"\b(?:\d{2}'\s*)?WW\s*\d{1,2}(?:'\s*\d{2})?\b", "", name, flags=re.IGNORECASE)
@@ -45,7 +54,9 @@ def render_drafts(
         )
         first_workbook_url = next(iter(workbooks.values()), "")
         body_html = (
-            template.replace("{{OWNER}}", escape(first.owner_name or owner_email))
+            template.replace(
+                "{{OWNER}}", escape(_owner_display_name(first.owner_name, owner_email))
+            )
             .replace("{{PROJECT_NAME}}", escape(projects))
             .replace("{{MRC_PROJECT}}", escape(mrc_projects))
             .replace("{{EXCEL_LINKS}}", workbook_links)

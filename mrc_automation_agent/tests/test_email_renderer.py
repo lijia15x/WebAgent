@@ -22,6 +22,58 @@ class EmailRendererTests(unittest.TestCase):
         self.assertIn("Thank you for your cooperation.", draft.body_html)
         self.assertIn("Click Here to Update Status", draft.body_html)
 
+    def test_uses_email_local_part_in_greeting(self) -> None:
+        record = ProjectRecord(
+            "MRC.xlsx",
+            "https://example.invalid/MRC.xlsx",
+            "Status",
+            2,
+            "",
+            "System Boards",
+            "",
+            "first.last@example.com",
+            "",
+        )
+
+        draft = render_drafts("2026WW38", 42, [record], "reminder")[0]
+
+        self.assertIn("Hi First Last,", draft.body_html)
+        self.assertNotIn("Hi first.last@example.com,", draft.body_html)
+
+    def test_formats_common_email_separators_in_greeting(self) -> None:
+        record = ProjectRecord(
+            "MRC.xlsx",
+            "https://example.invalid/MRC.xlsx",
+            "Status",
+            2,
+            "",
+            "System Boards",
+            "",
+            "mary_jane-smith@example.com",
+            "",
+        )
+
+        draft = render_drafts("2026WW38", 42, [record], "reminder")[0]
+
+        self.assertIn("Hi Mary Jane Smith,", draft.body_html)
+
+    def test_preserves_non_email_owner_name_in_greeting(self) -> None:
+        record = ProjectRecord(
+            "MRC.xlsx",
+            "https://example.invalid/MRC.xlsx",
+            "Status",
+            2,
+            "",
+            "System Boards",
+            "Alex Kim",
+            "alex@example.com",
+            "",
+        )
+
+        draft = render_drafts("2026WW38", 42, [record], "reminder")[0]
+
+        self.assertIn("Hi Alex Kim,", draft.body_html)
+
     def test_builds_mrc_project_name_from_workbook_name(self) -> None:
         name = "OKS DHE Technical and Execution Status WW34'26.xlsx"
 
