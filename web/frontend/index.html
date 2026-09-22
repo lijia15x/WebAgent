@@ -184,6 +184,19 @@
       </footer>
     </form>
   </dialog>
+  <dialog class="test-mail-dialog" id="sendMailDialog">
+    <form id="sendMailForm">
+      <header><strong data-i18n="confirmMailTitle">Confirm mail delivery</strong><button class="icon-button" type="button" id="closeSendMailDialog" aria-label="Close" data-i18n-aria="close">×</button></header>
+      <div class="test-mail-dialog-body">
+        <p id="sendMailConfirmation"></p>
+        <p data-i18n="confirmMailWarning">Emails will be sent immediately and cannot be recalled.</p>
+      </div>
+      <footer>
+        <button class="quiet-button" type="button" id="cancelSendMail" data-i18n="cancel">Cancel</button>
+        <button class="sync-button" type="submit" data-i18n="confirmSend">Send</button>
+      </footer>
+    </form>
+  </dialog>
   <div class="toast" id="toast" role="status"></div>
   <script src="./app.js"></script>
 </body>

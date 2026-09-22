@@ -88,6 +88,10 @@ const translations = {
     reminderTemplate: "提醒邮件模板",
     scanSharePoint: "扫描 SharePoint",
     sendMail: "发送邮件",
+    confirmMailTitle: "确认发送邮件",
+    confirmMailScopeAll: "将发送 {cycle} 的全部邮件草稿。",
+    confirmMailScopeMissing: "将发送 {cycle} 中仅未填写负责人的邮件草稿。",
+    confirmMailWarning: "邮件将立即发送，且无法撤回。",
     sendTestMail: "测试邮件",
     recipientEmail: "收件邮箱",
     recipientEmailPlaceholder: "name@example.com",
@@ -215,6 +219,10 @@ const translations = {
     reminderTemplate: "Reminder template",
     scanSharePoint: "Scan SharePoint",
     sendMail: "Send Mail",
+    confirmMailTitle: "Confirm mail delivery",
+    confirmMailScopeAll: "Send all email drafts for {cycle}.",
+    confirmMailScopeMissing: "Send email drafts only to owners with missing updates for {cycle}.",
+    confirmMailWarning: "Emails will be sent immediately and cannot be recalled.",
     sendTestMail: "Test Mail",
     recipientEmail: "Recipient email",
     recipientEmailPlaceholder: "name@example.com",
@@ -679,7 +687,14 @@ document.querySelectorAll('input[name="reminderType"]').forEach(input => {
     });
   });
 });
-document.querySelector("#sendMail").addEventListener("click", sendMrcMail);
+document.querySelector("#sendMail").addEventListener("click", () => {
+  const cycleCode = document.querySelector("#targetWeek").textContent;
+  const scopeKey = document.querySelector("#sendAll").checked
+    ? "confirmMailScopeAll"
+    : "confirmMailScopeMissing";
+  document.querySelector("#sendMailConfirmation").textContent = t(scopeKey).replace("{cycle}", cycleCode);
+  document.querySelector("#sendMailDialog").showModal();
+});
 document.querySelector("#sendTestMail").addEventListener("click", () => {
   const dialog = document.querySelector("#testMailDialog");
   const recipient = document.querySelector("#testMailRecipient");
@@ -709,6 +724,13 @@ document.querySelector("#openTemplate").addEventListener("click", () => {
   document.querySelector("#emailDialog").showModal();
 });
 document.querySelector("#closeEmailDialog").addEventListener("click", () => document.querySelector("#emailDialog").close());
+document.querySelector("#closeSendMailDialog").addEventListener("click", () => document.querySelector("#sendMailDialog").close());
+document.querySelector("#cancelSendMail").addEventListener("click", () => document.querySelector("#sendMailDialog").close());
+document.querySelector("#sendMailForm").addEventListener("submit", event => {
+  event.preventDefault();
+  document.querySelector("#sendMailDialog").close();
+  sendMrcMail();
+});
 document.querySelector("#closeTestMailDialog").addEventListener("click", () => document.querySelector("#testMailDialog").close());
 document.querySelector("#cancelTestMail").addEventListener("click", () => document.querySelector("#testMailDialog").close());
 document.querySelector("#testMailForm").addEventListener("submit", event => {
