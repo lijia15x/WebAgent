@@ -9,6 +9,20 @@ from .models import EmailDraft, ProjectRecord
 TEMPLATE_PATH = Path(__file__).with_name("templates") / "status_reminder_email.html"
 
 
+def _subject_workbook_name(workbook_name: str) -> str:
+    name = Path(workbook_name).stem
+    workweek = re.search(r"\b\d{2}'WW\d{1,2}\b", name, flags=re.IGNORECASE)
+    return name[:workweek.end()].strip() if workweek else name
+
+
+def _email_subject(reminder_type: str, workbook_names: list[str]) -> str:
+    reminder_label = "2nd Reminder" if reminder_type == "lastreminder" else "1st Reminder"
+    workbook_title = ", ".join(
+        dict.fromkeys(_subject_workbook_name(name) for name in workbook_names)
+    )
+    return f"Action Required: Update the {workbook_title} - {reminder_label}"
+
+
 def _owner_display_name(owner_name: str, owner_email: str) -> str:
     display_name = owner_name or owner_email
     if "@" not in display_name:
@@ -45,6 +59,7 @@ def render_drafts(
         workbooks = {
             record.workbook_name: record.workbook_url for record in owner_records
         }
+        subject = _email_subject(reminder_type, list(workbooks))
         mrc_projects = ", ".join(
             dict.fromkeys(_mrc_project_name(name) for name in workbooks)
         )
@@ -57,6 +72,7 @@ def render_drafts(
             template.replace(
                 "{{OWNER}}", escape(_owner_display_name(first.owner_name, owner_email))
             )
+            .replace("{{EMAIL_SUBJECT}}", escape(subject))
             .replace("{{PROJECT_NAME}}", escape(projects))
             .replace("{{MRC_PROJECT}}", escape(mrc_projects))
             .replace("{{EXCEL_LINKS}}", workbook_links)
@@ -66,7 +82,7 @@ def render_drafts(
             EmailDraft(
                 owner_name=first.owner_name,
                 owner_email=owner_email,
-                subject=f'Action Required: update the "{mrc_projects}" MRC status.',
+                subject=subject,
                 body_html=body_html,
                 project_count=len(owner_records),
                 idempotency_key=(
