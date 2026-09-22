@@ -85,6 +85,7 @@ const translations = {
     noSavedScan: "该报告周期还没有已保存的扫描",
     noDrafts: "当前筛选没有负责人",
     snapshotLoadFailed: "无法加载已保存的扫描",
+    reminderTemplate: "提醒邮件模板",
     scanSharePoint: "扫描 SharePoint",
     sendMail: "发送邮件",
     sendTestMail: "测试邮件",
@@ -116,6 +117,7 @@ const translations = {
     missingOnly: "仅未填写者",
     finalReminder: "最终提醒",
     weeklyReport: "周报",
+    summary: "摘要",
     recipients: "收件人",
     draftQueue: "草稿队列",
     drafts: "封草稿",
@@ -210,6 +212,7 @@ const translations = {
     noSavedScan: "No saved scan exists for this reporting cycle",
     noDrafts: "No owners match this filter",
     snapshotLoadFailed: "Unable to load the saved scan",
+    reminderTemplate: "Reminder template",
     scanSharePoint: "Scan SharePoint",
     sendMail: "Send Mail",
     sendTestMail: "Test Mail",
@@ -241,6 +244,7 @@ const translations = {
     missingOnly: "Missing only",
     finalReminder: "Final reminder",
     weeklyReport: "Weekly report",
+    summary: "Summary",
     recipients: "Recipients",
     draftQueue: "Draft queue",
     drafts: "drafts",
@@ -340,6 +344,9 @@ function updateAutomationControls() {
   label.textContent = t(label.dataset.i18n);
   toggle.disabled = mrcScanRunning;
   document.querySelector("#scanPreview").disabled = automationEnabled || mrcScanRunning;
+  document.querySelectorAll('input[name="reminderType"]').forEach(input => {
+    input.disabled = automationEnabled || mrcScanRunning;
+  });
   document.querySelector("#previousWeek").disabled = automationEnabled || mrcScanRunning;
   document.querySelector("#nextWeek").disabled = automationEnabled || mrcScanRunning;
   document.querySelector("#sendMail").disabled = automationEnabled || mrcScanRunning;
@@ -549,9 +556,10 @@ async function runMrcAction(endpoint, body, startedMessage) {
 
 function runMrcScan() {
   const cycleCode = document.querySelector("#targetWeek").textContent;
+  const reminderType = document.querySelector('input[name="reminderType"]:checked').value;
   return runMrcAction(
     "/api/agents/mrc-automation/scans",
-    { cycle_code: cycleCode },
+    { cycle_code: cycleCode, reminder_type: reminderType },
     t("scanStarted"),
   );
 }
@@ -660,6 +668,17 @@ document.querySelector("#automationToggle").addEventListener("click", async () =
   }
 });
 document.querySelector("#scanPreview").addEventListener("click", runMrcScan);
+document.querySelectorAll('input[name="reminderType"]').forEach(input => {
+  input.addEventListener("change", () => {
+    if (!input.checked) {
+      input.checked = true;
+      return;
+    }
+    document.querySelectorAll('input[name="reminderType"]').forEach(other => {
+      if (other !== input) other.checked = false;
+    });
+  });
+});
 document.querySelector("#sendMail").addEventListener("click", sendMrcMail);
 document.querySelector("#sendTestMail").addEventListener("click", () => {
   const dialog = document.querySelector("#testMailDialog");

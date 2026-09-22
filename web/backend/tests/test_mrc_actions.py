@@ -26,6 +26,18 @@ class FakeDatabase:
 
 
 class MrcActionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_submit_scan_forwards_selected_reminder_type(self) -> None:
+        service = MrcService()
+        service.get_automation_enabled = AsyncMock(return_value=False)
+        service._submit = AsyncMock(return_value="run-id")
+
+        run_id = await service.submit_scan("2026WW38", "lastreminder")
+
+        self.assertEqual("run-id", run_id)
+        service._submit.assert_awaited_once_with(
+            service._run_scan, "2026WW38", "lastreminder"
+        )
+
     async def test_automation_blocks_manual_actions(self) -> None:
         service = MrcService()
         service.get_automation_enabled = AsyncMock(return_value=True)

@@ -54,9 +54,11 @@ class MrcService:
             run.task = asyncio.create_task(operation(run, *arguments))
             return run.run_id
 
-    async def submit_scan(self, cycle_code: str) -> str:
+    async def submit_scan(
+        self, cycle_code: str, reminder_type: str = "reminder"
+    ) -> str:
         await self._require_manual_actions()
-        return await self._submit(self._run_scan, cycle_code)
+        return await self._submit(self._run_scan, cycle_code, reminder_type)
 
     async def submit_ppt(self, cycle_code: str) -> str:
         await self._require_manual_actions()
@@ -115,7 +117,9 @@ class MrcService:
             **event,
         }
 
-    async def _run_scan(self, run: MrcRun, cycle_code: str) -> None:
+    async def _run_scan(
+        self, run: MrcRun, cycle_code: str, reminder_type: str
+    ) -> None:
         loop = asyncio.get_running_loop()
 
         def emit(event: dict[str, Any]) -> None:
@@ -134,7 +138,7 @@ class MrcService:
                 graph.invoke,
                 {
                     "cycle_code": cycle_code,
-                    "reminder_type": "reminder",
+                    "reminder_type": reminder_type,
                     "triggered_by": "manual",
                 },
             )

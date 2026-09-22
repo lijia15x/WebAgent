@@ -1,6 +1,7 @@
 import asyncio
 import json
 from pathlib import Path
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import FileResponse, StreamingResponse
@@ -19,6 +20,7 @@ class MessageRequest(BaseModel):
 
 class MrcScanRequest(BaseModel):
     cycle_code: str = Field(pattern=r"^\d{4}WW(?:0[1-9]|[1-4]\d|5[0-3])$")
+    reminder_type: Literal["reminder", "lastreminder"] = "reminder"
 
 
 class MrcMailRequest(BaseModel):
@@ -82,7 +84,9 @@ async def submit_message(agent_id: str, request: MessageRequest) -> dict:
 @app.post("/api/agents/mrc-automation/scans", status_code=status.HTTP_202_ACCEPTED)
 async def submit_mrc_scan(request: MrcScanRequest) -> dict:
     try:
-        run_id = await mrc_service.submit_scan(request.cycle_code)
+        run_id = await mrc_service.submit_scan(
+            request.cycle_code, request.reminder_type
+        )
     except MrcBusyError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return {"run_id": run_id, "status": "running"}

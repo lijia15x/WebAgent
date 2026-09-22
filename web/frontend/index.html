@@ -86,7 +86,13 @@
           </div>
           <div class="preview-badge"><i></i><span data-i18n="staticPreview">Manual operation mode</span></div>
           <button class="automation-button" type="button" id="automationToggle" aria-pressed="false"><span class="automation-indicator" aria-hidden="true"></span><span data-i18n="enableAutomation">Enable automation</span></button>
-          <button class="sync-button" type="button" id="scanPreview"><span aria-hidden="true">↻</span><span data-i18n="scanSharePoint">Scan SharePoint</span></button>
+          <div class="scan-action">
+            <div class="reminder-selector" role="group" aria-label="Reminder template" data-i18n-aria="reminderTemplate">
+              <label><input type="checkbox" name="reminderType" value="reminder" checked><span>1st</span></label>
+              <label><input type="checkbox" name="reminderType" value="lastreminder"><span>2nd</span></label>
+            </div>
+            <button class="sync-button" type="button" id="scanPreview"><span aria-hidden="true">↻</span><span data-i18n="scanSharePoint">Scan SharePoint</span></button>
+          </div>
           <div class="mail-action"><label><input type="checkbox" id="sendAll"><span data-i18n="allOwnersOption">All</span></label><button class="action-button" type="button" id="sendMail"><span data-i18n="sendMail">Send Mail</span></button></div>
           <button class="action-button" type="button" id="sendTestMail"><span data-i18n="sendTestMail">Test Mail</span></button>
           <button class="action-button" type="button" id="generatePpt"><span data-i18n="generatePpt">Generate PPT</span></button>
@@ -109,11 +115,9 @@
             <div class="schedule-flow">
               <div class="schedule-step is-active"><b>Last Tue</b><span data-i18n="allOwners">All owners</span><small data-i18n="firstReminder">First reminder</small></div>
               <div class="schedule-line"></div>
-              <div class="schedule-step"><b>Last Thu</b><span data-i18n="allOwners">All owners</span><small data-i18n="secondReminder">Second reminder</small></div>
+              <div class="schedule-step warning"><b>Mon</b><span data-i18n="missingOnly">Missing only</span><small data-i18n="secondReminder">Second reminder</small></div>
               <div class="schedule-line"></div>
-              <div class="schedule-step warning"><b>Mon</b><span data-i18n="missingOnly">Missing only</span><small data-i18n="finalReminder">Final reminder</small></div>
-              <div class="schedule-line"></div>
-              <div class="schedule-step ppt-step"><b>Tue</b><span data-i18n="generatePpt">Generate PPT</span><small data-i18n="weeklyReport">Weekly report</small></div>
+              <div class="schedule-step ppt-step"><b>Tue</b><span data-i18n="generatePpt">Generate PPT</span><small data-i18n="summary">Summary</small></div>
             </div>
           </section>
 
