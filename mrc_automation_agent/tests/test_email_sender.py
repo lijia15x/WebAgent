@@ -48,6 +48,7 @@ class SmtpEmailSenderTests(unittest.TestCase):
         message = client.send_message.call_args.args[0]
         self.assertEqual("sys_DHE_AI_ASSISTANT@intel.com", message["From"])
         self.assertEqual("alex@example.com", message["To"])
+        self.assertEqual("sys_DHE_AI_ASSISTANT@intel.com", message["Cc"])
         self.assertEqual("MRC reminder", message["Subject"])
         self.assertEqual("html", message.get_content_subtype())
         self.assertIn("<p>Please update.</p>", message.get_content())

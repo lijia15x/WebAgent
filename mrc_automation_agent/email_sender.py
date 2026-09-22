@@ -6,6 +6,9 @@ from .config import MrcConfig
 from .models import EmailDraft
 
 
+MRC_CC_EMAIL = "sys_DHE_AI_ASSISTANT@intel.com"
+
+
 class SmtpEmailSender:
     def __init__(self, config: MrcConfig) -> None:
         self._config = config
@@ -37,6 +40,7 @@ class SmtpEmailSender:
         message = EmailMessage()
         message["From"] = self._config.smtp_sender_email
         message["To"] = draft.owner_email
+        message["Cc"] = MRC_CC_EMAIL
         message["Subject"] = draft.subject
         message.set_content(draft.body_html, subtype="html", charset="utf-8")
         self._client.send_message(message)
