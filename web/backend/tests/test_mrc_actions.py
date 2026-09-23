@@ -1,4 +1,6 @@
 import asyncio
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -100,6 +102,68 @@ class MrcActionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual("error", event["type"])
         self.assertIn("scan SharePoint again", event["message"])
         generate.assert_not_called()
+
+    async def test_ppt_upload_requires_generated_ppt(self) -> None:
+        service = MrcService()
+        run = MrcRun("run", asyncio.Queue())
+        with (
+            patch("web.backend.mrc_service.list_cycle_artifacts", return_value=[]),
+            patch("web.backend.mrc_service.SharePointClient") as client_type,
+        ):
+            await service._run_ppt_upload(run, "2026WW40")
+
+        event = await run.events.get()
+        self.assertEqual("error", event["type"])
+        self.assertEqual("ppt_not_found", event["code"])
+        self.assertIn("generate PPT", event["message"])
+        client_type.assert_not_called()
+
+    async def test_ppt_upload_uses_mocked_sharepoint_workweek_folder(self) -> None:
+        service = MrcService()
+        run = MrcRun("run", asyncio.Queue())
+        artifact = MrcArtifact(
+            "ppt", "Weekly Summary.pptx", "2026WW40/ppt/Weekly Summary.pptx"
+        )
+        config = Mock(
+            sharepoint_folder_template=(
+                "/sites/DHE/Shared Documents/DHE Execution MRC/{cycle_code}"
+            )
+        )
+        with TemporaryDirectory() as directory:
+            ppt_path = Path(directory) / artifact.file_name
+            ppt_path.write_bytes(b"ppt-content")
+            with (
+                patch(
+                    "web.backend.mrc_service.list_cycle_artifacts",
+                    return_value=[artifact],
+                ),
+                patch(
+                    "web.backend.mrc_service.resolve_artifact",
+                    return_value=ppt_path,
+                ),
+                patch(
+                    "web.backend.mrc_service.MrcConfig.from_env",
+                    return_value=config,
+                ),
+                patch("web.backend.mrc_service.SharePointClient") as client_type,
+            ):
+                client_type.return_value.upload_ppts.return_value = [
+                    artifact.file_name
+                ]
+                await service._run_ppt_upload(run, "2026WW40")
+
+        events = []
+        while not run.events.empty():
+            events.append(await run.events.get())
+        self.assertEqual("completed", events[-1]["type"])
+        self.assertEqual("ppt_upload", events[-1]["operation"])
+        self.assertEqual(
+            "/sites/DHE/Shared Documents/DHE Execution MRC/2026WW40",
+            events[-1]["folder"],
+        )
+        client_type.return_value.upload_ppts.assert_called_once_with(
+            "2026WW40", [(artifact.file_name, b"ppt-content")]
+        )
 
     async def test_mail_sends_selected_database_drafts_and_updates_status(self) -> None:
         service = MrcService()

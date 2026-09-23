@@ -6,7 +6,7 @@ from typing import Any
 from urllib.parse import quote
 from uuid import uuid4
 
-from mrc_automation_agent.artifact_store import list_cycle_artifacts
+from mrc_automation_agent.artifact_store import list_cycle_artifacts, resolve_artifact
 from mrc_automation_agent.config import MrcConfig
 from mrc_automation_agent.database import MrcDatabase
 from mrc_automation_agent.graph import create_mrc_graph
@@ -63,6 +63,10 @@ class MrcService:
     async def submit_ppt(self, cycle_code: str) -> str:
         await self._require_manual_actions()
         return await self._submit(self._run_ppt, cycle_code)
+
+    async def submit_ppt_upload(self, cycle_code: str) -> str:
+        await self._require_manual_actions()
+        return await self._submit(self._run_ppt_upload, cycle_code)
 
     async def submit_mail(self, cycle_code: str, include_all: bool) -> str:
         await self._require_manual_actions()
@@ -235,6 +239,67 @@ class MrcService:
             await run.events.put(self._event(run, {"type": "completed", "operation": "ppt", "artifacts": self._serialize_artifacts(cycle_code, [*artifacts, *generated])}))
         except Exception as exc:
             await run.events.put(self._event(run, {"type": "error", "message": str(exc)}))
+        finally:
+            self._status = "idle"
+
+    async def _run_ppt_upload(self, run: MrcRun, cycle_code: str) -> None:
+        try:
+            ppt_artifacts = [
+                artifact
+                for artifact in list_cycle_artifacts(cycle_code)
+                if artifact.kind == "ppt"
+            ]
+            if not ppt_artifacts:
+                raise FileNotFoundError("Please generate PPTs before uploading")
+            files = [
+                (
+                    artifact.file_name,
+                    resolve_artifact(cycle_code, "ppt", artifact.file_name).read_bytes(),
+                )
+                for artifact in ppt_artifacts
+            ]
+            await run.events.put(
+                self._event(
+                    run,
+                    {
+                        "type": "progress",
+                        "stage": "upload_ppt",
+                        "message": "Uploading PPTs to the SharePoint workweek folder",
+                    },
+                )
+            )
+            config = MrcConfig.from_env()
+            uploaded = await asyncio.to_thread(
+                SharePointClient(config).upload_ppts, cycle_code, files
+            )
+            await run.events.put(
+                self._event(
+                    run,
+                    {
+                        "type": "completed",
+                        "operation": "ppt_upload",
+                        "uploaded": uploaded,
+                        "folder": config.sharepoint_folder_template.format(
+                            cycle_code=cycle_code
+                        ),
+                    },
+                )
+            )
+        except FileNotFoundError as exc:
+            await run.events.put(
+                self._event(
+                    run,
+                    {
+                        "type": "error",
+                        "code": "ppt_not_found",
+                        "message": str(exc),
+                    },
+                )
+            )
+        except Exception as exc:
+            await run.events.put(
+                self._event(run, {"type": "error", "message": str(exc)})
+            )
         finally:
             self._status = "idle"
 

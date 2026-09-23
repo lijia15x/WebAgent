@@ -101,6 +101,18 @@ async def generate_mrc_ppt(cycle_code: str) -> dict:
     return {"run_id": run_id, "status": "running"}
 
 
+@app.post(
+    "/api/agents/mrc-automation/cycles/{cycle_code}/ppt/upload",
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def upload_mrc_ppt(cycle_code: str) -> dict:
+    try:
+        run_id = await mrc_service.submit_ppt_upload(cycle_code)
+    except MrcBusyError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"run_id": run_id, "status": "running"}
+
+
 @app.post("/api/agents/mrc-automation/cycles/{cycle_code}/mail", status_code=status.HTTP_202_ACCEPTED)
 async def send_mrc_mail(cycle_code: str, request: MrcMailRequest) -> dict:
     try:

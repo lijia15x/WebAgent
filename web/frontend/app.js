@@ -81,6 +81,7 @@ const translations = {
     scanStarted: "MRC 扫描已启动",
     mailStarted: "邮件发送任务已启动",
     pptStarted: "PPT 生成任务已启动",
+    pptUploadStarted: "PPT 上传任务已启动",
     scanCompleted: "MRC 扫描已完成并保存",
     noSavedScan: "该报告周期还没有已保存的扫描",
     noDrafts: "当前筛选没有负责人",
@@ -101,10 +102,13 @@ const translations = {
     testMailStarted: "测试邮件发送任务已启动",
     testMailCompleted: "测试邮件已发送",
     generatePpt: "生成 PPT",
+    uploadPpt: "上传 PPT",
     allOwnersOption: "全部",
     notUpdated: "未填写",
     mailCompleted: "邮件发送完成",
     pptCompleted: "PPT 生成完成",
+    pptUploadCompleted: "PPT 已上传到 SharePoint",
+    generatePptFirst: "请先生成 PPT",
     excelFiles: "Excel 文件",
     weeklyExcel: "当周 Excel",
     generatedPpt: "生成的 PPT",
@@ -212,6 +216,7 @@ const translations = {
     scanStarted: "MRC scan started",
     mailStarted: "Mail delivery started",
     pptStarted: "PPT generation started",
+    pptUploadStarted: "PPT upload started",
     scanCompleted: "MRC scan completed and saved",
     noSavedScan: "No saved scan exists for this reporting cycle",
     noDrafts: "No owners match this filter",
@@ -232,10 +237,13 @@ const translations = {
     testMailStarted: "Test mail delivery started",
     testMailCompleted: "Test mail sent",
     generatePpt: "Generate PPT",
+    uploadPpt: "Upload PPT",
     allOwnersOption: "All",
     notUpdated: "Not Updated",
     mailCompleted: "Mail delivery completed",
     pptCompleted: "PPT generation completed",
+    pptUploadCompleted: "PPT uploaded to SharePoint",
+    generatePptFirst: "Please generate PPT first",
     excelFiles: "Excel files",
     weeklyExcel: "Weekly Excel",
     generatedPpt: "Generated PPT",
@@ -361,6 +369,7 @@ function updateAutomationControls() {
   document.querySelector("#sendTestMail").disabled = automationEnabled || mrcScanRunning;
   document.querySelector("#sendAll").disabled = automationEnabled || mrcScanRunning;
   document.querySelector("#generatePpt").disabled = automationEnabled || mrcScanRunning;
+  document.querySelector("#uploadPpt").disabled = automationEnabled || mrcScanRunning;
   document.querySelector("#openTemplate").disabled = automationEnabled || mrcScanRunning;
   document.querySelectorAll("[data-draft-filter]").forEach(button => {
     button.disabled = automationEnabled || mrcScanRunning;
@@ -534,6 +543,8 @@ async function runMrcAction(endpoint, body, startedMessage) {
           showToast(`${t("testMailCompleted")}: ${event.recipient}`);
         } else if (event.operation === "ppt") {
           showToast(t("pptCompleted"));
+        } else if (event.operation === "ppt_upload") {
+          showToast(t("pptUploadCompleted"));
         } else {
           showToast(t("scanCompleted"));
         }
@@ -542,7 +553,7 @@ async function runMrcAction(endpoint, body, startedMessage) {
         mrcEventSource.close();
       }
       if (event.type === "error") {
-        showToast(event.message);
+        showToast(event.code === "ppt_not_found" ? t("generatePptFirst") : event.message);
         mrcScanRunning = false;
         updateAutomationControls();
         mrcEventSource.close();
@@ -596,6 +607,15 @@ function generateMrcPpt() {
     `/api/agents/mrc-automation/cycles/${cycleCode}/ppt`,
     {},
     t("pptStarted"),
+  );
+}
+
+function uploadMrcPpt() {
+  const cycleCode = document.querySelector("#targetWeek").textContent;
+  return runMrcAction(
+    `/api/agents/mrc-automation/cycles/${cycleCode}/ppt/upload`,
+    {},
+    t("pptUploadStarted"),
   );
 }
 
@@ -703,6 +723,7 @@ document.querySelector("#sendTestMail").addEventListener("click", () => {
   recipient.focus();
 });
 document.querySelector("#generatePpt").addEventListener("click", generateMrcPpt);
+document.querySelector("#uploadPpt").addEventListener("click", uploadMrcPpt);
 document.querySelectorAll("[data-draft-filter]").forEach(button => {
   button.addEventListener("click", () => {
     draftFilter = button.dataset.draftFilter;

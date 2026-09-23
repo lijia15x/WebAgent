@@ -17,7 +17,7 @@ class SharePointClient:
     def __init__(self, config: MrcConfig) -> None:
         self._config = config
 
-    def fetch_workbooks(self, cycle_code: str) -> list[WorkbookFile]:
+    def _create_context(self):
         self._config.require_sharepoint()
         from cryptography.hazmat.primitives import serialization
         from cryptography.hazmat.primitives.serialization import pkcs12
@@ -37,12 +37,15 @@ class SharePointClient:
             encryption_algorithm=serialization.NoEncryption(),
         ).decode("utf-8")
 
-        context = ClientContext(self._config.sharepoint_site_url).with_client_certificate(
+        return ClientContext(self._config.sharepoint_site_url).with_client_certificate(
             tenant=self._config.sharepoint_tenant,
             client_id=self._config.sharepoint_client_id,
             thumbprint=self._config.sharepoint_thumbprint,
             private_key=private_key_pem,
         )
+
+    def fetch_workbooks(self, cycle_code: str) -> list[WorkbookFile]:
+        context = self._create_context()
         folder_url = self._config.sharepoint_folder_template.format(
             cycle_code=cycle_code
         )
@@ -69,3 +72,17 @@ class SharePointClient:
                 )
             )
         return workbooks
+
+    def upload_ppts(
+        self, cycle_code: str, files: list[tuple[str, bytes]]
+    ) -> list[str]:
+        context = self._create_context()
+        folder_url = self._config.sharepoint_folder_template.format(
+            cycle_code=cycle_code
+        )
+        folder = context.web.get_folder_by_server_relative_url(folder_url)
+        uploaded = []
+        for file_name, content in files:
+            folder.upload_file(file_name, content).execute_query()
+            uploaded.append(file_name)
+        return uploaded

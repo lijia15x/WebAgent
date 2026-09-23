@@ -1,9 +1,35 @@
 import unittest
+from unittest.mock import Mock, patch
 
-from mrc_automation_agent.sharepoint_client import _excel_web_url
+from mrc_automation_agent.sharepoint_client import SharePointClient, _excel_web_url
 
 
 class SharePointClientTests(unittest.TestCase):
+    def test_upload_ppts_targets_configured_workweek_folder(self) -> None:
+        config = Mock(
+            sharepoint_folder_template=(
+                "/sites/DHE/Shared Documents/DHE Execution MRC/{cycle_code}"
+            )
+        )
+        client = SharePointClient(config)
+        context = Mock()
+        folder = context.web.get_folder_by_server_relative_url.return_value
+        upload = folder.upload_file.return_value
+
+        with patch.object(client, "_create_context", return_value=context):
+            uploaded = client.upload_ppts(
+                "2026WW40", [("Weekly Summary.pptx", b"ppt-content")]
+            )
+
+        context.web.get_folder_by_server_relative_url.assert_called_once_with(
+            "/sites/DHE/Shared Documents/DHE Execution MRC/2026WW40"
+        )
+        folder.upload_file.assert_called_once_with(
+            "Weekly Summary.pptx", b"ppt-content"
+        )
+        upload.execute_query.assert_called_once_with()
+        self.assertEqual(["Weekly Summary.pptx"], uploaded)
+
     def test_builds_excel_online_url(self) -> None:
         url = _excel_web_url(
             "https://intel.sharepoint.com/sites/DHE",
