@@ -43,7 +43,7 @@ class FakeSharePoint:
 
 
 class MrcGraphTests(unittest.TestCase):
-    def test_fixed_graph_builds_last_reminder_draft_for_missing_owner(self) -> None:
+    def test_fixed_graph_builds_last_reminder_drafts_for_all_owners(self) -> None:
         database = FakeDatabase()
         sharepoint = FakeSharePoint()
         events: list[dict] = []
@@ -56,8 +56,14 @@ class MrcGraphTests(unittest.TestCase):
             return records
 
         def renderer(cycle_code, scan_run_id, eligible, reminder_type):
-            self.assertEqual(["alex@example.com"], [item.owner_email for item in eligible])
-            return [EmailDraft("Alex", "alex@example.com", "Subject", "<p>Body</p>", 1, "key")]
+            self.assertEqual(
+                ["alex@example.com", "maya@example.com"],
+                [item.owner_email for item in eligible],
+            )
+            return [
+                EmailDraft("Alex", "alex@example.com", "Subject", "<p>Body</p>", 1, "key-1"),
+                EmailDraft("Maya", "maya@example.com", "Subject", "<p>Body</p>", 1, "key-2"),
+            ]
 
         def store(cycle_code, workbooks):
             return [MrcArtifact("excel", "MRC.xlsx", "2026WW38/excel/MRC.xlsx")]
@@ -79,7 +85,7 @@ class MrcGraphTests(unittest.TestCase):
         self.assertEqual("", result["error"])
         self.assertEqual(1, sharepoint.calls)
         self.assertEqual(2, len(database.completed[2]))
-        self.assertEqual(1, len(database.completed[3]))
+        self.assertEqual(2, len(database.completed[3]))
         self.assertEqual(["excel"], [item.kind for item in result["artifacts"]])
         self.assertEqual(
             [

@@ -154,6 +154,40 @@ class MrcDatabaseTests(unittest.TestCase):
             "ORDER BY workbook_name, sheet_name, source_row, id", statement
         )
 
+    def test_get_sendable_drafts_includes_all_owners_when_requested(self) -> None:
+        database = MrcDatabase(FakeMySqlDatabase())
+        drafts = [
+            {"owner_email": "missing@example.com", "status": "draft", "missing_updates": 1},
+            {"owner_email": "updated@example.com", "status": "draft", "missing_updates": 0},
+        ]
+        database.get_latest_scan = Mock(return_value={"drafts": drafts})
+
+        self.assertEqual(drafts, database.get_sendable_drafts("2026WW38", True))
+
+    def test_get_sendable_drafts_excludes_updated_owners_by_default(self) -> None:
+        database = MrcDatabase(FakeMySqlDatabase())
+        missing = {
+            "owner_email": "missing@example.com",
+            "status": "draft",
+            "missing_updates": 1,
+        }
+        database.get_latest_scan = Mock(
+            return_value={
+                "drafts": [
+                    missing,
+                    {
+                        "owner_email": "updated@example.com",
+                        "status": "draft",
+                        "missing_updates": 0,
+                    },
+                ]
+            }
+        )
+
+        self.assertEqual(
+            [missing], database.get_sendable_drafts("2026WW38", False)
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

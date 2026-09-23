@@ -136,13 +136,6 @@ def create_mrc_graph(
         records = state.get("records", [])
         if state["reminder_type"] == "ppt":
             return {"eligible_records": []}
-        if state["reminder_type"] == "lastreminder":
-            missing_owners = {
-                record.owner_email
-                for record in records
-                if record.owner_email and record.is_missing_update
-            }
-            records = [record for record in records if record.owner_email in missing_owners]
         return {"eligible_records": records}
 
     def build_drafts(state: MrcState) -> dict[str, Any]:
