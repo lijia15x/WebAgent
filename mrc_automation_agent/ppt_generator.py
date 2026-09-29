@@ -24,40 +24,117 @@ PAGE2_DETAIL_TEXTBOX_LEFT = 588135
 PAGE2_DETAIL_TEXTBOX_TOP = 2871854
 PAGE2_DETAIL_TEXTBOX_WIDTH = 11168038
 PAGE2_DETAIL_TEXTBOX_HEIGHT = 2808461
-TEMPLATE_PATH = (
+DEFAULT_TEMPLATE_PATH = (
     Path(__file__).resolve().parent
     / "templates"
     / "DMR Johnson City SXT Executive Summary V2.pptx"
 )
+DMR_RS_TEMPLATE_PATH = (
+    Path(__file__).resolve().parent / "templates" / "DMR-RS_template.pptx"
+)
+TEMPLATE_PATH = DEFAULT_TEMPLATE_PATH
 
 PAGE2_PROMPT = """You are preparing slide 2 of an executive summary PPT from the attached Excel workbook.
-The workbook contains these worksheets: {sheet_names}.
-Analyze the sheet or sheets containing execution status for {cycle_code}.
-Do not assume a fixed worksheet name. Ignore administrative, lookup, and instruction sheets unless needed for context.
-When the workbook has Platform and Engineering Domain columns, treat Platform as the engineering group classification
-and Engineering Domain as the project or domain within that group. Carry merged or blank Platform cells down to the
-following Engineering Domain rows until the next non-empty Platform value.
+
+Reporting cycle: {cycle_code}
+Workbook worksheets: {sheet_names}
+
+Identify the execution-status worksheet and the current reporting-week columns. Convert {cycle_code} from YYYYWWNN
+to the workbook label WWNN'YY when necessary. For example, 2026WW40 corresponds to WW40'26.
+A merged week heading may cover two columns:
+- Status Comments / Status & Problem Statement
+- Mitigation Plan
+
+Use the Platform and Engineering Domain columns as the reporting hierarchy. Platform is the engineering group;
+Engineering Domain is the project or domain within that group. Carry merged or blank Platform cells downward until
+the next non-empty Platform value.
+
+Treat the workbook's color-grading key as authoritative:
+- R = Blocked: critical issue with no mitigation plan
+- O = At Risk: mitigation plan is still work in progress
+- Y = On Track: approved mitigation plan exists
+- G = On Track: no issue
+- Done = all deliverables completed
+- N/A = not applicable
+
+The status columns such as Schedule, Resource and Spending, Platform PCOS, NUDDs, Quality, and Technical Execution
+are independent health dimensions. Rank attention using R > O > Y > G > Done; ignore N/A.
+Do not describe Y as blocked or at risk.
+
+Use the current-week status and mitigation columns as the primary narrative evidence. Use older weekly columns only
+to identify an explicit trend or change. If the current-week status cell is blank, state that no current-week
+narrative update was provided; never substitute historical text as a current update.
+
 Return only valid JSON with this schema:
-{{"executive_summary":[{{"bold_lead":"judgment","normal_detail":"supporting facts"}}],
-"detail_sections":[{{"title":"engineering group","paragraphs":[{{"bold_lead":"judgment","normal_detail":"supporting facts"}}]}}]}}.
-Use exactly 2 executive_summary paragraphs and the 2 engineering groups needing the most leadership attention,
-with exactly 2 paragraphs per group. Use workbook facts, dates, quantities, status colors, risks, and milestones.
-Do not use Markdown or code fences."""
+{{"executive_summary":[
+  {{"bold_lead":"leadership judgment","normal_detail":"supporting workbook facts"}},
+  {{"bold_lead":"leadership judgment","normal_detail":"supporting workbook facts"}}
+],
+"detail_sections":[
+  {{"title":"Platform name","paragraphs":[
+    {{"bold_lead":"priority judgment","normal_detail":"supporting Domain, status dimension, current-week facts and mitigation"}},
+    {{"bold_lead":"priority judgment","normal_detail":"supporting Domain, status dimension, current-week facts and mitigation"}}
+  ]}}
+]}}
+
+Requirements:
+- Produce exactly 2 executive_summary paragraphs.
+- Select exactly 2 Platforms requiring the most leadership attention.
+- Produce exactly 2 paragraphs for each selected Platform.
+- Name the relevant Engineering Domain and status dimension in supporting details.
+- Prioritize blocked and at-risk items, missing mitigation, schedule impact, dependencies, and dated milestones.
+- Consolidate healthy progress instead of listing every green item.
+- Do not invent facts, dates, quantities, status meanings, risks, causes, or mitigations.
+- Do not mention cell addresses in slide 2.
+- Do not use Markdown or code fences."""
 
 PAGE3_PROMPT = """Create slide 3 detailed executive narrative for {cycle_code} from the attached Excel workbook.
-The workbook contains these worksheets: {sheet_names}.
-Identify the sheet or sheets containing the current execution status.
-Do not assume a fixed worksheet name, header row, or column position. Use headers and values to identify engineering
-groups, domains, status, risks, dates, and milestones for the requested week. Return only valid JSON with this schema:
-When Platform and Engineering Domain columns are present, organize sections by Platform and describe the Engineering
-Domain rows within each Platform. Carry merged or blank Platform cells down until the next non-empty Platform value.
-{{"sections":[{{"title":"engineering group","paragraphs":[
-{{"bold_lead":"synthesized conclusion","normal_detail":"supporting workbook facts",
-"source":"worksheet name!L12"}}]}}]}}.
-Include all major engineering groups with exactly 2 paragraphs each. Prioritize red, orange, and yellow risks,
-consolidate green progress, and keep all returned text within {max_chars} characters. For every paragraph, source must
-identify the most important original Excel evidence cell using the exact worksheet name and cell address. Prefer the
-current-week status cell. Do not include a URL in source. No Markdown or code fences."""
+
+Workbook worksheets: {sheet_names}
+
+Identify the execution-status worksheet and the current reporting-week columns. Convert {cycle_code} from YYYYWWNN
+to the workbook label WWNN'YY when necessary. For example, 2026WW40 corresponds to WW40'26.
+A merged week heading may cover the Status & Problem Statement column and its Mitigation Plan column.
+
+Organize the narrative by Platform and describe the Engineering Domain rows within each Platform.
+Carry merged or blank Platform cells downward until the next non-empty Platform value.
+
+Treat the workbook's color-grading key as authoritative:
+- R = Blocked: critical issue with no mitigation plan
+- O = At Risk: mitigation plan is still work in progress
+- Y = On Track: approved mitigation plan exists
+- G = On Track: no issue
+- Done = all deliverables completed
+- N/A = not applicable
+
+Evaluate Schedule, Resource and Spending, Platform PCOS, NUDDs, Quality, and Technical Execution independently.
+Use severity R > O > Y > G > Done and ignore N/A. Do not describe Y as blocked or at risk.
+
+Use the current-week Status & Problem Statement and Mitigation Plan cells as primary evidence.
+Historical week columns may be used only for an explicit trend comparison.
+If the current-week narrative is blank, say that no current-week update was provided and rely only on the structured
+status cells; never present historical text as a current-week update.
+
+Return only valid JSON with this schema:
+{{"sections":[
+  {{"title":"Platform name","paragraphs":[
+    {{"bold_lead":"synthesized conclusion","normal_detail":"supporting Domain, status dimension, current-week facts and mitigation","source":"exact worksheet name!L12"}},
+    {{"bold_lead":"synthesized conclusion","normal_detail":"supporting Domain, status dimension, current-week facts and mitigation","source":"exact worksheet name!E12"}}
+  ]}}
+]}}
+
+Requirements:
+- Include every major Platform represented in the execution-status table.
+- Produce exactly 2 paragraphs per Platform.
+- Prioritize R and O items, then Y items needing monitoring; consolidate G progress.
+- Identify the Engineering Domain and affected status dimension.
+- Mention concrete dates, quantities, dependencies, milestones, and mitigation only when present in the workbook.
+- Keep all returned narrative text within {max_chars} characters.
+- Every source must be an existing cell using the exact worksheet name and address.
+- Prefer the current-week narrative or mitigation cell as the source.
+- When no current-week narrative exists, cite the relevant structured status cell instead.
+- Never cite a blank cell, merged placeholder cell, historical cell presented as current, or invented address.
+- Do not include URLs, Markdown, or code fences."""
 
 
 def _parse_json_response(content: str) -> dict[str, Any]:
@@ -83,6 +160,12 @@ def _sheet_names(excel_path: Path) -> list[str]:
         return workbook.sheetnames
     finally:
         workbook.close()
+
+
+def _template_path_for(file_name: str) -> Path:
+    if "dmr-rs" in file_name.casefold():
+        return DMR_RS_TEMPLATE_PATH
+    return DEFAULT_TEMPLATE_PATH
 
 
 def _paragraphs(value: object, count: int | None = None) -> list[dict[str, str]]:
@@ -209,38 +292,22 @@ def _replace_week_tokens(slide, label: str) -> None:
             _set_text_preserving_font_size(
                 shape,
                 re.sub(
-                    r"(?i)WW\s*\d{1,2}(?:\s*[‘']?\s*\d{2,4})?",
+                    r"(?i)WW\s*\d{1,2}(?:\s*[‘’']?\s*\d{2,4})?",
                     label,
                     shape.text,
                 ),
             )
 
 
-def _week_labels(cycle_code: str, count: int = 5, step: int = 4) -> list[str]:
-    week = int(cycle_code[-2:])
-    year = int(cycle_code[2:4])
-    labels = []
-    for _ in range(count):
-        labels.append(f"WW{week:02d}'{year:02d}")
-        week -= step
-        while week < 1:
-            week += 52
-            year -= 1
-    return labels
-
-
 def _update_page2(slide, cycle_code: str, page2: dict[str, Any]) -> None:
     long_text_shapes = []
-    week_labels = iter(_week_labels(cycle_code))
-    dashboard_label = f"WW{cycle_code[-2:]} {cycle_code[:4]}"
+    dashboard_label = f"WW{cycle_code[-2:]}'{cycle_code[:4]}"
     for shape in _text_shapes(slide):
         text = (shape.text or "").strip()
         if not text:
             continue
         if re.search(r"(?i)platform\s+dashboard", text):
             _replace_week_tokens_for_shape(shape, dashboard_label)
-        elif re.match(r"(?i)^WW\s*\d{1,2}", text):
-            _set_text_preserving_font_size(shape, next(week_labels, text))
         elif len(text) > 80:
             long_text_shapes.append(shape)
 
@@ -268,7 +335,7 @@ def _replace_week_tokens_for_shape(shape, label: str) -> None:
     _set_text_preserving_font_size(
         shape,
         re.sub(
-            r"(?i)WW\s*\d{1,2}(?:\s*[‘']?\s*\d{2,4})?",
+            r"(?i)WW\s*\d{1,2}(?:\s*[‘’']?\s*\d{2,4})?",
             label,
             shape.text,
         ),
@@ -290,7 +357,7 @@ def _update_presentation(
     if len(presentation.slides) < 3:
         raise ValueError("PPT template must contain at least three slides")
 
-    dashboard_label = f"WW{cycle_code[-2:]} {cycle_code[:4]}"
+    dashboard_label = f"WW{cycle_code[-2:]}'{cycle_code[:4]}"
     _replace_week_tokens(presentation.slides[0], dashboard_label)
     _update_page2(presentation.slides[1], cycle_code, page2)
     _replace_week_tokens(presentation.slides[2], dashboard_label)
@@ -321,14 +388,14 @@ def generate_weekly_ppts(
     )
     if not sources:
         raise FileNotFoundError("No weekly Excel workbooks are available for PPT generation")
-    if not TEMPLATE_PATH.is_file():
-        raise FileNotFoundError(f"PPT template does not exist: {TEMPLATE_PATH}")
-
     output_dir = WORKSPACE_ROOT / cycle_code / "ppt"
     output_dir.mkdir(parents=True, exist_ok=True)
     generated = []
     for source in sources:
         excel_path = WORKSPACE_ROOT / source.relative_path
+        template_path = _template_path_for(source.file_name)
+        if not template_path.is_file():
+            raise FileNotFoundError(f"PPT template does not exist: {template_path}")
         sheet_names = json.dumps(_sheet_names(excel_path), ensure_ascii=False)
         page2 = _call_copilot_json(
             PAGE2_PROMPT.format(cycle_code=cycle_code, sheet_names=sheet_names),
@@ -345,7 +412,7 @@ def generate_weekly_ppts(
             excel_path,
         )
         page3["source_url"] = source.source_url
-        output_path = output_dir / f"{excel_path.stem}_generated.pptx"
-        _update_presentation(TEMPLATE_PATH, output_path, cycle_code, page2, page3)
+        output_path = output_dir / f"{excel_path.stem}_AI_generated.pptx"
+        _update_presentation(template_path, output_path, cycle_code, page2, page3)
         generated.append(register_ppt(cycle_code, output_path, source.file_name))
     return generated

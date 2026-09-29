@@ -11,10 +11,34 @@ from mrc_automation_agent.models import MrcArtifact
 
 
 class PptGeneratorTests(unittest.TestCase):
+    def test_selects_template_from_excel_file_name(self) -> None:
+        self.assertEqual(
+            ppt_generator.DMR_RS_TEMPLATE_PATH,
+            ppt_generator._template_path_for("DMR-RS Dashboard.xlsx"),
+        )
+        self.assertEqual(
+            ppt_generator.DMR_RS_TEMPLATE_PATH,
+            ppt_generator._template_path_for("dmr-rs dashboard.XLSX"),
+        )
+        self.assertEqual(
+            ppt_generator.DEFAULT_TEMPLATE_PATH,
+            ppt_generator._template_path_for("Other Dashboard.xlsx"),
+        )
+
+    def test_replaces_week_token_with_right_curly_apostrophe_year(self) -> None:
+        presentation = Presentation()
+        slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+        shape = slide.shapes.add_textbox(0, 0, 1000000, 1000000)
+        shape.text = "OKS-AP\nWW25’26"
+
+        ppt_generator._replace_week_tokens(slide, "WW40'2026")
+
+        self.assertEqual("OKS-AP\nWW40'2026", shape.text)
+
     def test_prompts_preserve_platform_and_engineering_domain_hierarchy(self) -> None:
-        self.assertIn("treat Platform as the engineering group", ppt_generator.PAGE2_PROMPT)
-        self.assertIn("Engineering Domain as the project", ppt_generator.PAGE2_PROMPT)
-        self.assertIn("organize sections by Platform", ppt_generator.PAGE3_PROMPT)
+        self.assertIn("Platform is the engineering group", ppt_generator.PAGE2_PROMPT)
+        self.assertIn("Engineering Domain is the project", ppt_generator.PAGE2_PROMPT)
+        self.assertIn("Organize the narrative by Platform", ppt_generator.PAGE3_PROMPT)
 
     def test_copilot_call_does_not_inherit_log_analysis_workspace(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -68,6 +92,13 @@ class PptGeneratorTests(unittest.TestCase):
                 }
             ]
         }
+        template = Presentation(str(ppt_generator.DEFAULT_TEMPLATE_PATH))
+        template_progress_labels = [
+            shape.text
+            for shape in template.slides[1].shapes
+            if getattr(shape, "has_text_frame", False)
+            and shape.text.startswith("WW")
+        ]
 
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)
@@ -110,6 +141,13 @@ class PptGeneratorTests(unittest.TestCase):
                 )
 
             self.assertEqual([execution.name, tracking.name], [item.source_workbook_name for item in generated])
+            self.assertEqual(
+                [
+                    "CRI-ww38-MRC_AI_generated.pptx",
+                    "DHE Execution MRC AR Tracking_AI_generated.pptx",
+                ],
+                [item.file_name for item in generated],
+            )
             self.assertEqual(execution, copilot.call_args_list[0].args[2])
             self.assertEqual(tracking, copilot.call_args_list[2].args[2])
             self.assertIn('["Status WW38", "Lookup"]', copilot.call_args_list[0].args[0])
@@ -129,7 +167,7 @@ class PptGeneratorTests(unittest.TestCase):
                     if getattr(shape, "has_text_frame", False)
                 ]
                 self.assertIn(
-                    "Platform Dashboard –WW38 2026",
+                    "Platform Dashboard –WW38'2026",
                     [shape.text for shape in page2_text_shapes],
                 )
                 dashboard_shape = next(
@@ -142,7 +180,7 @@ class PptGeneratorTests(unittest.TestCase):
                     dashboard_shape.text_frame.paragraphs[0].runs[0].font.size.pt,
                 )
                 self.assertEqual(
-                    ["WW38'26", "WW34'26", "WW30'26", "WW26'26", "WW22'26"],
+                    template_progress_labels,
                     [shape.text for shape in page2_text_shapes if shape.text.startswith("WW")],
                 )
                 self.assertTrue(
