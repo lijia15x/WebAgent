@@ -7,14 +7,20 @@ import threading
 from pathlib import Path
 from typing import Callable
 
-from ..skills.contracts import CommandResult
+from ..agent.contracts import CommandResult
 
 
 class CommandExecutionError(RuntimeError):
     pass
 
 
-SKILL_MODULE = re.compile(r"^log_analysis_agent\.skills\.[a-zA-Z_][\w.]*$")
+ALLOWED_SKILL_MODULES = frozenset(
+    {
+        "common.skills.jenkins_api.get_job_status",
+        "common.skills.jenkins_api.get_console_log",
+        "common.skills.copilot_sdk.run_copilot",
+    }
+)
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 COMMAND_TIMEOUT_SECONDS = 330
 
@@ -26,9 +32,9 @@ def parse_command(command: str) -> list[str]:
         raise CommandExecutionError(f"Invalid command format: {exc}") from exc
     if len(arguments) < 3 or arguments[0] not in {"python", "python.exe"}:
         raise CommandExecutionError("The command must start with python -m")
-    if arguments[1] != "-m" or not SKILL_MODULE.fullmatch(arguments[2]):
+    if arguments[1] != "-m" or arguments[2] not in ALLOWED_SKILL_MODULES:
         raise CommandExecutionError(
-            "Only Python modules under log_analysis_agent.skills may be executed"
+            "The Python module is not allowed for the Jenkins log analysis agent"
         )
     return [sys.executable, *arguments[1:]]
 
@@ -97,7 +103,7 @@ def execute_command(
         arguments = parse_command(command)
         stream_copilot = (
             arguments[2]
-            == "log_analysis_agent.skills.copilot_sdk.run_copilot"
+            == "common.skills.copilot_sdk.run_copilot"
         )
         if stream_copilot:
             completed = _execute_streaming_command(arguments, on_event)

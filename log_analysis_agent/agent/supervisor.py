@@ -2,8 +2,8 @@ import json
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from ..skills.base import skill_index
-from ..skills.contracts import RouteDecision
+from .contracts import RouteDecision
+from .skill_registry import skill_index
 
 
 SUPERVISOR_PROMPT = """You are a task-routing supervisor.

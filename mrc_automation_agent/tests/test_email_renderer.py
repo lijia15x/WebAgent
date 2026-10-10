@@ -1,0 +1,134 @@
+import unittest
+
+from mrc_automation_agent.email_renderer import (
+    _email_subject,
+    _mrc_project_name,
+    _subject_workbook_name,
+    render_drafts,
+)
+from mrc_automation_agent.models import ProjectRecord
+
+
+class EmailRendererTests(unittest.TestCase):
+    def test_builds_first_reminder_subject_from_workbook_name(self) -> None:
+        self.assertEqual(
+            "Action Required: Update the DMR-RS MRC Dashboard 26'WW40 - 1st Reminder",
+            _email_subject(
+                "reminder",
+                ["DMR-RS MRC Dashboard 26'WW40 Working Copy.xlsx"],
+            ),
+        )
+
+    def test_builds_second_reminder_subject_for_last_reminder(self) -> None:
+        self.assertEqual(
+            "Action Required: Update the DMR-RS MRC Dashboard 26'WW40 - 2nd Reminder",
+            _email_subject(
+                "lastreminder",
+                ["DMR-RS MRC Dashboard 26'WW40 Working Copy.xlsx"],
+            ),
+        )
+
+    def test_subject_workbook_name_removes_extension_without_workweek(self) -> None:
+        self.assertEqual("MRC", _subject_workbook_name("MRC.xlsx"))
+
+    def test_uses_email_subject_as_first_reminder_banner_title(self) -> None:
+        record = ProjectRecord(
+            "MRC.xlsx", "https://example.invalid/MRC.xlsx", "Status", 2,
+            "Core", "System Boards", "Alex", "alex@example.com", "",
+        )
+
+        draft = render_drafts("2026WW38", 42, [record], "reminder")[0]
+
+        self.assertIn(f">{draft.subject}</div>", draft.body_html)
+
+    def test_uses_email_subject_as_second_reminder_banner_title(self) -> None:
+        record = ProjectRecord(
+            "MRC.xlsx", "https://example.invalid/MRC.xlsx", "Status", 2,
+            "Core", "System Boards", "Alex", "alex@example.com", "",
+        )
+
+        draft = render_drafts("2026WW38", 42, [record], "lastreminder")[0]
+
+        self.assertIn(f">{draft.subject}</div>", draft.body_html)
+
+    def test_includes_each_owner_workbook_link(self) -> None:
+        records = [
+            ProjectRecord("One.xlsx", "https://example.invalid/one", "Status", 2, "Core", "A", "Alex", "alex@example.com", ""),
+            ProjectRecord("Two.xlsx", "https://example.invalid/two", "Status", 3, "Core", "B", "Alex", "alex@example.com", ""),
+        ]
+
+        draft = render_drafts("2026WW38", 42, records, "reminder")[0]
+
+        self.assertEqual(
+            "Action Required: Update the One, Two - 1st Reminder",
+            draft.subject,
+        )
+        self.assertIn("One.xlsx", draft.body_html)
+        self.assertIn("Two.xlsx", draft.body_html)
+        self.assertIn("https://example.invalid/one", draft.body_html)
+        self.assertIn("https://example.invalid/two", draft.body_html)
+        self.assertIn("owner of the <strong>A, B</strong> function team", draft.body_html)
+        self.assertNotIn("Core", draft.body_html)
+        self.assertIn("Thank you for your cooperation.", draft.body_html)
+        self.assertIn("Click Here to Update Status", draft.body_html)
+
+    def test_uses_email_local_part_in_greeting(self) -> None:
+        record = ProjectRecord(
+            "MRC.xlsx",
+            "https://example.invalid/MRC.xlsx",
+            "Status",
+            2,
+            "",
+            "System Boards",
+            "",
+            "first.last@example.com",
+            "",
+        )
+
+        draft = render_drafts("2026WW38", 42, [record], "reminder")[0]
+
+        self.assertIn("Hi First Last,", draft.body_html)
+        self.assertNotIn("Hi first.last@example.com,", draft.body_html)
+
+    def test_formats_common_email_separators_in_greeting(self) -> None:
+        record = ProjectRecord(
+            "MRC.xlsx",
+            "https://example.invalid/MRC.xlsx",
+            "Status",
+            2,
+            "",
+            "System Boards",
+            "",
+            "mary_jane-smith@example.com",
+            "",
+        )
+
+        draft = render_drafts("2026WW38", 42, [record], "reminder")[0]
+
+        self.assertIn("Hi Mary Jane Smith,", draft.body_html)
+
+    def test_preserves_non_email_owner_name_in_greeting(self) -> None:
+        record = ProjectRecord(
+            "MRC.xlsx",
+            "https://example.invalid/MRC.xlsx",
+            "Status",
+            2,
+            "",
+            "System Boards",
+            "Alex Kim",
+            "alex@example.com",
+            "",
+        )
+
+        draft = render_drafts("2026WW38", 42, [record], "reminder")[0]
+
+        self.assertIn("Hi Alex Kim,", draft.body_html)
+
+    def test_builds_mrc_project_name_from_workbook_name(self) -> None:
+        name = "OKS DHE Technical and Execution Status WW34'26.xlsx"
+
+        self.assertEqual("OKS DHE Technical and Execution", _mrc_project_name(name))
+
+
+if __name__ == "__main__":
+    unittest.main()

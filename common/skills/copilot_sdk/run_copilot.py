@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import json
+import os
 import sys
 
 from .copilot_sdk_client import ask_copilot
@@ -13,7 +14,9 @@ def main() -> int:
     parser.add_argument("--prompt", required=True)
     parser.add_argument("--file", action="append", default=[])
     parser.add_argument("--workspace")
-    parser.add_argument("--model", default="auto")
+    parser.add_argument(
+        "--model", default=os.getenv("LOG_ANALYSIS_MODEL", "gpt-5.5")
+    )
     parser.add_argument("--timeout", type=float, default=300.0)
     arguments = parser.parse_args()
 
@@ -29,6 +32,10 @@ def main() -> int:
         stream_started = True
         emit_event({"type": "answer_delta", "content": delta})
 
+    def stream_process_delta(delta: str) -> None:
+        if delta:
+            emit_event({"type": "process_delta", "content": delta})
+
     def stream_activity(activity: str) -> None:
         emit_event({"type": "copilot_activity", "message": activity})
 
@@ -41,6 +48,7 @@ def main() -> int:
                 workspace=arguments.workspace,
                 timeout=arguments.timeout,
                 on_delta=stream_delta,
+                on_process_delta=stream_process_delta,
                 on_activity=stream_activity,
             )
         )

@@ -11,7 +11,7 @@ module commands. Return one command at a time and wait for its JSON result.
 ## Get job or build status
 
 ```text
-python -m log_analysis_agent.skills.jenkins_api.get_job_status --url "<job-or-build-url>"
+python -m common.skills.jenkins_api.get_job_status --url "<job-or-build-url>"
 ```
 
 This must run first. It accepts a Jenkins job URL or numbered build URL and returns
@@ -21,7 +21,7 @@ queries its latest build.
 ## Get console log
 
 ```text
-python -m log_analysis_agent.skills.jenkins_api.get_console_log --build-url "<specific-build-url>"
+python -m common.skills.jenkins_api.get_console_log --build-url "<specific-build-url>"
 ```
 
 Use the `build_url` returned by the status command. Run this only when the build
