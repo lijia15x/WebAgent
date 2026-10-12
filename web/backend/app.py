@@ -1,17 +1,41 @@
 import asyncio
 import json
+import re
+from tempfile import TemporaryDirectory
 from pathlib import Path
 from typing import Literal
+from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException, Request, status
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from mrc_automation_agent.artifact_store import resolve_artifact
+from pdf_to_yaml_agent import YamlGenerationError, generate_architecture_yaml
+from pdf_to_yaml_agent.reference_store import (
+    InvalidReferenceFile,
+    delete_reference,
+    ensure_reference_workspace,
+    list_reference_paths,
+    list_references,
+    normalize_reference_name,
+    resolve_reference,
+)
 
 from .agent_service import AgentBusyError, agent_service
 from .mrc_service import MrcBusyError, mrc_service
+
+
+MAX_PDF_BYTES = 100 * 1024 * 1024
+MAX_REFERENCE_BYTES = 20 * 1024 * 1024
+MAX_REFERENCE_FILES = 10
+DEFAULT_AUTHORING_GUIDE = (
+    Path(__file__).resolve().parents[2]
+    / ".temp"
+    / "yml"
+    / "I2C_architecture_YAML_authoring_guide.md"
+)
 
 
 class MessageRequest(BaseModel):
@@ -67,7 +91,138 @@ async def list_agents() -> list[dict]:
             "description": "Scan MRC workbooks and prepare individual email drafts.",
             "status": mrc_service.status,
         },
+        {
+            "id": "pdf-yaml",
+            "name": "PDF-to-YAML Architecture",
+            "description": "Convert I2C/I3C architecture PDFs into validated YAML.",
+            "status": "ready",
+        },
     ]
+
+
+def _safe_upload_name(file_name: str | None, fallback: str) -> str:
+    base_name = (file_name or fallback).replace("\\", "/").rsplit("/", 1)[-1]
+    safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", base_name).strip("._")
+    return safe_name or fallback
+
+
+async def _save_upload(upload: UploadFile, destination: Path, max_bytes: int) -> None:
+    size = 0
+    with destination.open("wb") as output:
+        while chunk := await upload.read(1024 * 1024):
+            size += len(chunk)
+            if size > max_bytes:
+                raise HTTPException(
+                    status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                    detail=f"{upload.filename or 'Upload'} exceeds the size limit",
+                )
+            output.write(chunk)
+
+
+@app.get("/api/agents/pdf-yaml/references")
+async def get_pdf_yaml_references() -> dict:
+    return {"files": list_references()}
+
+
+@app.post("/api/agents/pdf-yaml/references")
+async def upload_pdf_yaml_references(files: list[UploadFile] = File(...)) -> dict:
+    if not files or len(files) > MAX_REFERENCE_FILES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Upload between 1 and {MAX_REFERENCE_FILES} reference files",
+        )
+    try:
+        names = [normalize_reference_name(upload.filename) for upload in files]
+    except InvalidReferenceFile as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    existing_names = {path.name.casefold() for path in list_reference_paths()}
+    resulting_names = existing_names | {name.casefold() for name in names}
+    if len(resulting_names) > MAX_REFERENCE_FILES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"The workspace can contain at most {MAX_REFERENCE_FILES} reference files",
+        )
+
+    workspace = ensure_reference_workspace()
+    for upload, name in zip(files, names):
+        destination = resolve_reference(name)
+        temporary_path = workspace / f".{uuid4().hex}.upload"
+        try:
+            await _save_upload(upload, temporary_path, MAX_REFERENCE_BYTES)
+            temporary_path.replace(destination)
+        finally:
+            temporary_path.unlink(missing_ok=True)
+    return {"files": list_references()}
+
+
+@app.get("/api/agents/pdf-yaml/references/{file_name}")
+async def download_pdf_yaml_reference(file_name: str) -> FileResponse:
+    try:
+        file_path = resolve_reference(file_name)
+    except InvalidReferenceFile as exc:
+        raise HTTPException(status_code=404, detail="Reference file not found") from exc
+    if not file_path.is_file() or file_path.is_symlink():
+        raise HTTPException(status_code=404, detail="Reference file not found")
+    media_types = {
+        ".md": "text/markdown",
+        ".pdf": "application/pdf",
+        ".txt": "text/plain",
+        ".yaml": "application/yaml",
+        ".yml": "application/yaml",
+    }
+    media_type = media_types[file_path.suffix.lower()]
+    return FileResponse(file_path, media_type=media_type, filename=file_path.name)
+
+
+@app.delete("/api/agents/pdf-yaml/references/{file_name}")
+async def remove_pdf_yaml_reference(file_name: str) -> dict:
+    try:
+        deleted = delete_reference(file_name)
+    except InvalidReferenceFile as exc:
+        raise HTTPException(status_code=404, detail="Reference file not found") from exc
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Reference file not found")
+    return {"files": list_references()}
+
+
+@app.post("/api/agents/pdf-yaml/generate")
+async def generate_pdf_yaml(pdf: UploadFile = File(...)) -> dict:
+    pdf_name = _safe_upload_name(pdf.filename, "architecture.pdf")
+    if not pdf_name.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Architecture source must be a PDF")
+    with TemporaryDirectory(prefix="pdf-yaml-") as directory:
+        request_directory = Path(directory)
+        pdf_path = request_directory / pdf_name
+        await _save_upload(pdf, pdf_path, MAX_PDF_BYTES)
+
+        reference_paths = list_reference_paths()
+        if not reference_paths:
+            if not DEFAULT_AUTHORING_GUIDE.is_file():
+                raise HTTPException(
+                    status_code=500,
+                    detail="Default YAML authoring guide is unavailable",
+                )
+            reference_paths = [DEFAULT_AUTHORING_GUIDE]
+
+        try:
+            content, validation = await generate_architecture_yaml(
+                pdf_path, reference_paths
+            )
+        except YamlGenerationError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        except (RuntimeError, TimeoutError) as exc:
+            raise HTTPException(
+                status_code=502, detail=f"Copilot generation failed: {exc}"
+            ) from exc
+
+    output_stem = re.sub(r"[^A-Za-z0-9_-]+", "_", Path(pdf_name).stem).strip("_")
+    return {
+        "yaml": content,
+        "file_name": f"{output_stem or 'architecture'}.yml",
+        "source_file": pdf_name,
+        "validation": validation,
+    }
 
 
 @app.post("/api/agents/{agent_id}/messages", status_code=status.HTTP_202_ACCEPTED)

@@ -1,6 +1,7 @@
 const agents = {
   jenkins: { initials: "JL", title: "Jenkins Log Analyst", avatar: "avatar-jenkins", ready: true, descriptionKey: "agentDescription" },
   mrc: { initials: "MA", title: "MRC Automation", avatar: "avatar-mrc", ready: true, descriptionKey: "mrcDescription" },
+  "pdf-yaml": { initials: "PY", title: "PDF-to-YAML Architecture", avatar: "avatar-pdf", ready: true, descriptionKey: "pdfYamlDescription" },
 };
 
 const translations = {
@@ -19,6 +20,8 @@ const translations = {
     openAgentList: "打开 Agent 列表",
     agentDescription: "定位构建失败原因，并结合 Workspace 源码给出修复建议",
     mrcDescription: "扫描每周 MRC Excel，筛选负责人、发送提醒邮件或生成汇报 PPT",
+    pdfYamlDescription: "从 PDF 架构图提取可追溯的结构化 YAML",
+    workspaceReady: "工作区就绪",
     newSession: "新会话",
     showActivity: "显示执行轨迹",
     activityTitle: "执行轨迹",
@@ -138,6 +141,64 @@ const translations = {
     openTemplate: "打开模板",
     subject: "主题",
     previewScanComplete: "静态扫描预览已更新",
+    architecturePipeline: "架构处理流程",
+    pdfWorkspaceTitle: "将架构图转换为可追溯的 YAML",
+    pdfWorkspaceDescription: "配置 SharePoint 来源或直接上传 PDF。参考指南将作为 AI 提取时使用的编写规则。",
+    configurationStage: "配置阶段",
+    sharePointSource: "SharePoint 来源",
+    futureSource: "未来来源",
+    sourceLocation: "来源位置",
+    notSaved: "未保存",
+    saved: "已保存",
+    sharePointAddress: "SharePoint 文件夹地址",
+    saveAddress: "保存地址",
+    sharePointHint: "SharePoint 集成启用后，Agent 将扫描该位置中的 PDF 文件。",
+    directUpload: "直接上传",
+    architecturePdf: "架构 PDF",
+    requiredInput: "必需输入",
+    choosePdf: "选择架构 PDF",
+    pdfUploadHint: "仅支持 PDF · 每次转换一个文档",
+    authoringContext: "编写上下文",
+    referenceFiles: "AI 参考文件",
+    workspaceResource: "Workspace",
+    addFiles: "添加文件",
+    referenceHint: "上传 YAML 编写指南和相关规范。上传后可在此工作区下载。",
+    noReferenceFiles: "尚未上传参考文件",
+    referenceTypes: "支持 Markdown、PDF、YAML 和文本",
+    conversionRun: "转换任务",
+    generateYaml: "生成 YAML",
+    readDocument: "读取文档",
+    readDocumentDetail: "定位架构图",
+    extractTopology: "提取拓扑",
+    extractTopologyDetail: "板卡、器件、端口和连接",
+    validateYaml: "校验 YAML",
+    validateYamlDetail: "Schema 与可追溯性检查",
+    runRequirement: "选择本地 PDF 后即可准备转换。",
+    enginePending: "PDF 与参考文件仅在本次转换中发送给 Copilot。",
+    addressSaved: "SharePoint 地址已保存",
+    enterValidAddress: "请输入有效的 SharePoint 地址",
+    pdfSelected: "已选择 PDF 文件",
+    invalidPdf: "请选择 PDF 文件",
+    referenceAdded: "参考文件已添加",
+    invalidReference: "仅支持 Markdown、PDF、YAML 或文本参考文件",
+    referenceLoadFailed: "无法加载服务器参考文件",
+    referenceUploadFailed: "参考文件上传失败",
+    referenceDeleted: "参考文件已删除",
+    referenceDeleteFailed: "参考文件删除失败",
+    generatedArtifact: "生成产物",
+    generatedOutput: "Copilot 结果",
+    copyYaml: "复制",
+    downloadYaml: "下载 .yml",
+    regenerateYaml: "重新生成",
+    sourceDocument: "来源文档",
+    sourcePages: "来源页码",
+    sourcePagesPending: "等待 AI 识别",
+    generatedAt: "生成时间",
+    yamlCopied: "YAML 已复制",
+    yamlDownloaded: "YAML 文件已下载",
+    generatingYaml: "Copilot 正在生成…",
+    yamlGenerated: "YAML 已生成并通过校验",
+    yamlGenerationFailed: "YAML 生成失败",
   },
   en: {
     pageTitle: "Agent Desk",
@@ -154,6 +215,8 @@ const translations = {
     openAgentList: "Open agent list",
     agentDescription: "Find build failures and verify root causes against workspace source code",
     mrcDescription: "Scan weekly MRC workbooks, filter owners, send reminders, or generate report PPTs",
+    pdfYamlDescription: "Extract traceable, structured YAML from PDF architecture diagrams",
+    workspaceReady: "Workspace ready",
     newSession: "New session",
     showActivity: "Show execution activity",
     activityTitle: "Execution activity",
@@ -273,6 +336,64 @@ const translations = {
     openTemplate: "Open template",
     subject: "Subject",
     previewScanComplete: "Static scan preview refreshed",
+    architecturePipeline: "Architecture pipeline",
+    pdfWorkspaceTitle: "Turn architecture diagrams into traceable YAML",
+    pdfWorkspaceDescription: "Configure a SharePoint source or upload a PDF directly. Reference guides provide the authoring rules used during extraction.",
+    configurationStage: "Configuration stage",
+    sharePointSource: "SharePoint source",
+    futureSource: "Future source",
+    sourceLocation: "Source location",
+    notSaved: "Not saved",
+    saved: "Saved",
+    sharePointAddress: "SharePoint folder address",
+    saveAddress: "Save address",
+    sharePointHint: "The agent will scan PDF files from this location when SharePoint integration is enabled.",
+    directUpload: "Direct upload",
+    architecturePdf: "Architecture PDF",
+    requiredInput: "Required input",
+    choosePdf: "Choose an architecture PDF",
+    pdfUploadHint: "PDF only · one document per conversion",
+    authoringContext: "Authoring context",
+    referenceFiles: "AI reference files",
+    workspaceResource: "Workspace",
+    addFiles: "Add files",
+    referenceHint: "Upload the YAML authoring guide and related specifications. Uploaded files remain available for download in this workspace.",
+    noReferenceFiles: "No reference files uploaded",
+    referenceTypes: "Accepted formats: Markdown, PDF, YAML and text",
+    conversionRun: "Conversion run",
+    generateYaml: "Generate YAML",
+    readDocument: "Read document",
+    readDocumentDetail: "Locate architecture diagrams",
+    extractTopology: "Extract topology",
+    extractTopologyDetail: "Boards, elements, ports, connections",
+    validateYaml: "Validate YAML",
+    validateYamlDetail: "Schema and traceability checks",
+    runRequirement: "Choose a local PDF to prepare a conversion.",
+    enginePending: "The PDF and reference files are sent to Copilot for this conversion only.",
+    addressSaved: "SharePoint address saved",
+    enterValidAddress: "Enter a valid SharePoint address",
+    pdfSelected: "PDF selected",
+    invalidPdf: "Choose a PDF file",
+    referenceAdded: "Reference files added",
+    invalidReference: "Only Markdown, PDF, YAML or text reference files are supported",
+    referenceLoadFailed: "Unable to load server reference files",
+    referenceUploadFailed: "Reference file upload failed",
+    referenceDeleted: "Reference file deleted",
+    referenceDeleteFailed: "Reference file deletion failed",
+    generatedArtifact: "Generated artifact",
+    generatedOutput: "Copilot output",
+    copyYaml: "Copy",
+    downloadYaml: "Download .yml",
+    regenerateYaml: "Regenerate",
+    sourceDocument: "Source document",
+    sourcePages: "Source pages",
+    sourcePagesPending: "Pending AI detection",
+    generatedAt: "Generated",
+    yamlCopied: "YAML copied",
+    yamlDownloaded: "YAML file downloaded",
+    generatingYaml: "Copilot is generating…",
+    yamlGenerated: "YAML generated and validated",
+    yamlGenerationFailed: "YAML generation failed",
   },
 };
 
@@ -286,6 +407,7 @@ const activityList = document.querySelector("#activityList");
 const activityStatus = document.querySelector("#activityStatus");
 const languageToggle = document.querySelector("#languageToggle");
 const mrcWorkspace = document.querySelector("#mrcWorkspace");
+const pdfWorkspace = document.querySelector("#pdfWorkspace");
 const contentGrid = document.querySelector(".content-grid");
 const composerWrap = document.querySelector("#composerWrap");
 let selectedAgent = "jenkins";
@@ -652,12 +774,15 @@ function setAgent(id) {
   document.querySelector("#agentDescription").textContent = t(agent.descriptionKey);
   document.querySelector("#agentStatus").textContent = t("ready");
   const isMrc = id === "mrc";
-  document.querySelector(".chat-workspace").classList.toggle("mrc-mode", isMrc);
-  contentGrid.classList.toggle("is-hidden", isMrc);
-  composerWrap.classList.toggle("is-hidden", isMrc);
+  const isPdfYaml = id === "pdf-yaml";
+  const isToolWorkspace = isMrc || isPdfYaml;
+  document.querySelector(".chat-workspace").classList.toggle("mrc-mode", isToolWorkspace);
+  contentGrid.classList.toggle("is-hidden", isToolWorkspace);
+  composerWrap.classList.toggle("is-hidden", isToolWorkspace);
   mrcWorkspace.classList.toggle("is-hidden", !isMrc);
-  document.querySelector("#clearButton").classList.toggle("is-hidden", isMrc);
-  document.querySelector("#activityToggle").classList.toggle("is-hidden", isMrc);
+  pdfWorkspace.classList.toggle("is-hidden", !isPdfYaml);
+  document.querySelector("#clearButton").classList.toggle("is-hidden", isToolWorkspace);
+  document.querySelector("#activityToggle").classList.toggle("is-hidden", isToolWorkspace);
   document.querySelector("#runStrip").classList.add("is-hidden");
   sendButton.disabled = !agent.ready || isRunning || isMrc;
   input.disabled = !agent.ready || isRunning || isMrc;
@@ -669,7 +794,250 @@ function setAgent(id) {
     loadMrcAutomation();
     loadMrcSnapshot(currentCycle);
   }
+  if (isPdfYaml) restorePdfWorkspace();
 }
+
+const sharePointAddress = document.querySelector("#sharePointAddress");
+const sharePointSavedState = document.querySelector("#sharePointSavedState");
+const architecturePdfInput = document.querySelector("#architecturePdfInput");
+const selectedPdf = document.querySelector("#selectedPdf");
+const referenceFilesInput = document.querySelector("#referenceFilesInput");
+const referenceFileList = document.querySelector("#referenceFileList");
+const generateYamlButton = document.querySelector("#generateYaml");
+const yamlResult = document.querySelector("#yamlResult");
+const yamlPreview = document.querySelector("#yamlPreview");
+let architecturePdf;
+let referenceFiles = [];
+let generatedYaml = "";
+let generatedFileName = "architecture.yml";
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function updateConversionAvailability() {
+  generateYamlButton.disabled = !architecturePdf || generateYamlButton.classList.contains("is-loading");
+}
+
+function restorePdfWorkspace() {
+  const savedAddress = localStorage.getItem("pdfYamlSharePointAddress") || "";
+  if (!sharePointAddress.value) sharePointAddress.value = savedAddress;
+  const isSaved = Boolean(savedAddress) && sharePointAddress.value === savedAddress;
+  sharePointSavedState.textContent = t(isSaved ? "saved" : "notSaved");
+  sharePointSavedState.classList.toggle("is-saved", isSaved);
+  updateConversionAvailability();
+  loadReferenceFiles();
+}
+
+function renderReferenceFiles() {
+  if (!referenceFiles.length) {
+    referenceFileList.innerHTML = `<div class="reference-empty"><span>REF</span><p><strong>${t("noReferenceFiles")}</strong><small>${t("referenceTypes")}</small></p></div>`;
+    return;
+  }
+  referenceFileList.innerHTML = "";
+  referenceFiles.forEach(entry => {
+    const row = document.createElement("div");
+    row.className = "reference-file";
+    const suffix = entry.name.toLowerCase().split(".").pop();
+    const type = suffix === "yaml" || suffix === "yml" ? "YML" : suffix.toUpperCase();
+    row.innerHTML = `<span class="file-type">${type}</span><a></a><small>${formatFileSize(entry.size)}</small><button class="icon-button" type="button" aria-label="Remove file" title="Remove">×</button>`;
+    const link = row.querySelector("a");
+    link.textContent = entry.name;
+    link.href = `/api/agents/pdf-yaml/references/${encodeURIComponent(entry.name)}`;
+    link.download = entry.name;
+    row.querySelector("button").addEventListener("click", () => deleteReferenceFile(entry.name));
+    referenceFileList.appendChild(row);
+  });
+}
+
+async function loadReferenceFiles() {
+  try {
+    const response = await fetch("/api/agents/pdf-yaml/references");
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || t("referenceLoadFailed"));
+    referenceFiles = payload.files;
+    renderReferenceFiles();
+  } catch (error) {
+    showToast(error.message || t("referenceLoadFailed"));
+  }
+}
+
+async function deleteReferenceFile(fileName) {
+  try {
+    const response = await fetch(`/api/agents/pdf-yaml/references/${encodeURIComponent(fileName)}`, { method: "DELETE" });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || t("referenceDeleteFailed"));
+    referenceFiles = payload.files;
+    renderReferenceFiles();
+    showToast(t("referenceDeleted"));
+  } catch (error) {
+    showToast(error.message || t("referenceDeleteFailed"));
+  }
+}
+
+document.querySelector("#saveSharePoint").addEventListener("click", () => {
+  const address = sharePointAddress.value.trim();
+  try {
+    const url = new URL(address);
+    if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error();
+  } catch {
+    showToast(t("enterValidAddress"));
+    sharePointAddress.focus();
+    return;
+  }
+  localStorage.setItem("pdfYamlSharePointAddress", address);
+  sharePointSavedState.textContent = t("saved");
+  sharePointSavedState.classList.add("is-saved");
+  updateConversionAvailability();
+  showToast(t("addressSaved"));
+});
+
+sharePointAddress.addEventListener("input", () => {
+  const savedAddress = localStorage.getItem("pdfYamlSharePointAddress") || "";
+  const isSaved = sharePointAddress.value.trim() === savedAddress && Boolean(savedAddress);
+  sharePointSavedState.textContent = t(isSaved ? "saved" : "notSaved");
+  sharePointSavedState.classList.toggle("is-saved", isSaved);
+  updateConversionAvailability();
+});
+
+architecturePdfInput.addEventListener("change", () => {
+  const file = architecturePdfInput.files[0];
+  if (!file) return;
+  if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+    architecturePdfInput.value = "";
+    showToast(t("invalidPdf"));
+    return;
+  }
+  architecturePdf = file;
+  document.querySelector("#selectedPdfName").textContent = file.name;
+  document.querySelector("#selectedPdfMeta").textContent = formatFileSize(file.size);
+  selectedPdf.classList.remove("is-hidden");
+  updateConversionAvailability();
+  showToast(t("pdfSelected"));
+});
+
+document.querySelector("#removePdf").addEventListener("click", () => {
+  architecturePdf = undefined;
+  architecturePdfInput.value = "";
+  selectedPdf.classList.add("is-hidden");
+  updateConversionAvailability();
+});
+
+referenceFilesInput.addEventListener("change", async () => {
+  let rejected = false;
+  const acceptedFiles = Array.from(referenceFilesInput.files).filter(file => {
+    const name = file.name.toLowerCase();
+    if (![".md", ".pdf", ".txt", ".yaml", ".yml"].some(suffix => name.endsWith(suffix))) {
+      rejected = true;
+      return false;
+    }
+    return true;
+  });
+  referenceFilesInput.value = "";
+  if (!acceptedFiles.length) {
+    if (rejected) showToast(t("invalidReference"));
+    return;
+  }
+  const form = new FormData();
+  acceptedFiles.forEach(file => form.append("files", file, file.name));
+  try {
+    const response = await fetch("/api/agents/pdf-yaml/references", { method: "POST", body: form });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || t("referenceUploadFailed"));
+    referenceFiles = payload.files;
+    renderReferenceFiles();
+    showToast(t(rejected ? "invalidReference" : "referenceAdded"));
+  } catch (error) {
+    showToast(error.message || t("referenceUploadFailed"));
+  }
+});
+
+function outputFileName() {
+  return generatedFileName;
+}
+
+function highlightYaml(value) {
+  const escapeHtml = (text) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return value.split("\n").map((line) => {
+    const escaped = escapeHtml(line);
+    const parts = escaped.match(/^(\s*)(-\s+)?([^:#]+:)(.*)$/);
+    if (!parts) return escaped;
+    const content = parts[4]
+      .replace(/(&quot;.*?&quot;)/g, '<span class="yaml-string">$1</span>')
+      .replace(/\b(true|false|null)\b/g, '<span class="yaml-literal">$1</span>')
+      .replace(/\b(\d+)\b/g, '<span class="yaml-number">$1</span>');
+    return `${parts[1]}${parts[2] || ""}<span class="yaml-key">${parts[3]}</span>${content}`;
+  }).join("\n");
+}
+
+function renderGeneratedYaml(payload) {
+  generatedYaml = payload.yaml;
+  generatedFileName = payload.file_name;
+  document.querySelector("#yamlFileName").textContent = generatedFileName;
+  document.querySelector("#yamlSourceDocument").textContent = payload.source_file;
+  document.querySelector("#yamlGeneratedAt").textContent = new Date().toLocaleString(currentLanguage === "zh" ? "zh-CN" : "en-US");
+  document.querySelector("#yamlLineCount").textContent = `${generatedYaml.trimEnd().split("\n").length} lines`;
+  yamlPreview.innerHTML = highlightYaml(generatedYaml);
+  yamlResult.classList.remove("is-hidden");
+  yamlResult.scrollIntoView({ behavior: "smooth", block: "start" });
+  showToast(t("yamlGenerated"));
+}
+
+async function generateYaml() {
+  if (!architecturePdf) {
+    showToast(t("invalidPdf"));
+    return;
+  }
+  const form = new FormData();
+  form.append("pdf", architecturePdf, architecturePdf.name);
+  generateYamlButton.classList.add("is-loading");
+  generateYamlButton.querySelector("span").textContent = t("generatingYaml");
+  updateConversionAvailability();
+  try {
+    const response = await fetch("/api/agents/pdf-yaml/generate", { method: "POST", body: form });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || t("yamlGenerationFailed"));
+    renderGeneratedYaml(payload);
+  } catch (error) {
+    showToast(error.message || t("yamlGenerationFailed"));
+  } finally {
+    generateYamlButton.classList.remove("is-loading");
+    generateYamlButton.querySelector("span").textContent = t("generateYaml");
+    updateConversionAvailability();
+  }
+}
+
+async function copyGeneratedYaml() {
+  try {
+    await navigator.clipboard.writeText(generatedYaml);
+    showToast(t("yamlCopied"));
+  } catch {
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(yamlPreview);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+}
+
+function downloadGeneratedYaml() {
+  const url = URL.createObjectURL(new Blob([generatedYaml], { type: "application/yaml;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = outputFileName();
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  showToast(t("yamlDownloaded"));
+}
+
+generateYamlButton.addEventListener("click", generateYaml);
+document.querySelector("#regenerateYaml").addEventListener("click", generateYaml);
+document.querySelector("#copyYaml").addEventListener("click", copyGeneratedYaml);
+document.querySelector("#downloadYaml").addEventListener("click", downloadGeneratedYaml);
 
 document.querySelectorAll("button.agent-item[data-agent]").forEach(item => item.addEventListener("click", () => setAgent(item.dataset.agent)));
 document.querySelector("#openSidebar").addEventListener("click", () => sidebar.classList.add("is-open"));
@@ -793,7 +1161,12 @@ document.querySelector("#nextWeek").addEventListener("click", () => shiftTargetW
 languageToggle.addEventListener("click", () => {
   currentLanguage = currentLanguage === "zh" ? "en" : "zh";
   applyTranslations();
+  document.querySelector("#agentDescription").textContent = t(agents[selectedAgent].descriptionKey);
   updateAutomationControls();
+  if (selectedAgent === "pdf-yaml") {
+    restorePdfWorkspace();
+    renderReferenceFiles();
+  }
 });
 document.querySelector("#clearButton").addEventListener("click", () => {
   if (isRunning) {

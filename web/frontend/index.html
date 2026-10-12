@@ -18,7 +18,7 @@
         <div><strong>Agent Desk</strong><small data-i18n="brandSubtitle">Operations workspace</small></div>
         <button class="icon-button mobile-only" id="closeSidebar" aria-label="Close agent list" title="Close" data-i18n-aria="closeAgentList" data-i18n-title="close">×</button>
       </header>
-      <div class="sidebar-heading"><span>Agents</span><span class="agent-count">2</span></div>
+      <div class="sidebar-heading"><span>Agents</span><span class="agent-count">3</span></div>
       <nav class="agent-list" aria-label="Agent list" data-i18n-aria="agentList">
         <button class="agent-item is-active" data-agent="jenkins">
           <span class="agent-avatar avatar-jenkins">JL</span>
@@ -27,6 +27,10 @@
         <button class="agent-item" data-agent="mrc">
           <span class="agent-avatar avatar-mrc">MA</span>
           <span class="agent-copy"><strong>MRC Automation</strong><small><i class="status-dot idle"></i> <span data-i18n="previewReady">Preview ready</span></small></span><span class="chevron">›</span>
+        </button>
+        <button class="agent-item" data-agent="pdf-yaml">
+          <span class="agent-avatar avatar-pdf">PY</span>
+          <span class="agent-copy"><strong>PDF-to-YAML Architecture</strong><small><i class="status-dot idle"></i> <span data-i18n="workspaceReady">Workspace ready</span></small></span><span class="chevron">›</span>
         </button>
         <div class="agent-item agent-placeholder" aria-disabled="true">
           <span class="agent-avatar avatar-more">＋</span>
@@ -155,6 +159,91 @@
               </div>
             </section>
           </div>
+        </div>
+      </section>
+
+      <section class="pdf-workspace is-hidden" id="pdfWorkspace" aria-label="PDF-to-YAML Architecture workspace">
+        <div class="pdf-scroll">
+          <header class="pdf-intro">
+            <div>
+              <span class="eyebrow" data-i18n="architecturePipeline">Architecture pipeline</span>
+              <h2 data-i18n="pdfWorkspaceTitle">Turn architecture diagrams into traceable YAML</h2>
+              <p data-i18n="pdfWorkspaceDescription">Configure a SharePoint source or upload a PDF directly. Reference guides provide the authoring rules used during extraction.</p>
+            </div>
+            <div class="pipeline-status"><i></i><span data-i18n="configurationStage">Configuration stage</span></div>
+          </header>
+
+          <div class="pdf-layout">
+            <section class="pdf-main-column">
+              <article class="pdf-panel source-panel">
+                <header class="pdf-panel-heading"><div><span class="eyebrow" data-i18n="sharePointSource">SharePoint source</span><h3 data-i18n="sourceLocation">Source location</h3></div><div class="panel-heading-status"><span class="context-badge is-future" data-i18n="futureSource">Future source</span><span class="saved-state" id="sharePointSavedState" data-i18n="notSaved">Not saved</span></div></header>
+                <div class="source-form">
+                  <label for="sharePointAddress" data-i18n="sharePointAddress">SharePoint folder address</label>
+                  <div class="source-input-row">
+                    <input id="sharePointAddress" type="url" placeholder="https://intel.sharepoint.com/sites/..." autocomplete="off">
+                    <button class="sync-button" type="button" id="saveSharePoint"><span data-i18n="saveAddress">Save address</span></button>
+                  </div>
+                  <p data-i18n="sharePointHint">The agent will scan PDF files from this location when SharePoint integration is enabled.</p>
+                </div>
+              </article>
+
+              <article class="pdf-panel upload-panel">
+                <header class="pdf-panel-heading"><div><span class="eyebrow" data-i18n="directUpload">Direct upload</span><h3 data-i18n="architecturePdf">Architecture PDF</h3></div><span class="context-badge is-required" data-i18n="requiredInput">Required input</span></header>
+                <label class="drop-zone" for="architecturePdfInput" id="pdfDropZone">
+                  <input id="architecturePdfInput" type="file" accept="application/pdf,.pdf" hidden>
+                  <span class="upload-symbol" aria-hidden="true">↑</span>
+                  <strong data-i18n="choosePdf">Choose an architecture PDF</strong>
+                  <small data-i18n="pdfUploadHint">PDF only · one document per conversion</small>
+                </label>
+                <div class="selected-pdf is-hidden" id="selectedPdf">
+                  <span class="file-type">PDF</span><div><strong id="selectedPdfName"></strong><small id="selectedPdfMeta"></small></div><button class="icon-button" type="button" id="removePdf" aria-label="Remove PDF" title="Remove">×</button>
+                </div>
+              </article>
+
+              <article class="pdf-panel reference-panel">
+                <header class="pdf-panel-heading"><div><span class="eyebrow" data-i18n="authoringContext">Authoring context</span><h3 data-i18n="referenceFiles">AI reference files</h3></div><span class="context-badge" data-i18n="workspaceResource">Workspace</span><label class="quiet-button reference-upload" for="referenceFilesInput"><span aria-hidden="true">＋</span><span data-i18n="addFiles">Add files</span><input id="referenceFilesInput" type="file" accept=".md,.pdf,.txt,.yaml,.yml,text/markdown,text/plain,application/pdf,application/yaml" multiple hidden></label></header>
+                <p class="panel-copy" data-i18n="referenceHint">Upload the YAML authoring guide and related specifications. Uploaded files remain available for download in this workspace.</p>
+                <div class="reference-list" id="referenceFileList">
+                  <div class="reference-empty"><span>REF</span><p><strong data-i18n="noReferenceFiles">No reference files uploaded</strong><small data-i18n="referenceTypes">Accepted formats: Markdown, PDF, YAML and text</small></p></div>
+                </div>
+              </article>
+            </section>
+
+            <aside class="pdf-run-panel">
+              <span class="eyebrow" data-i18n="conversionRun">Conversion run</span>
+              <h3 data-i18n="generateYaml">Generate YAML</h3>
+              <div class="conversion-flow">
+                <div><span>1</span><p><strong data-i18n="readDocument">Read document</strong><small data-i18n="readDocumentDetail">Locate architecture diagrams</small></p></div>
+                <div><span>2</span><p><strong data-i18n="extractTopology">Extract topology</strong><small data-i18n="extractTopologyDetail">Boards, elements, ports, connections</small></p></div>
+                <div><span>3</span><p><strong data-i18n="validateYaml">Validate YAML</strong><small data-i18n="validateYamlDetail">Schema and traceability checks</small></p></div>
+              </div>
+              <div class="run-requirement"><span>!</span><p data-i18n="runRequirement">Choose a local PDF to prepare a conversion.</p></div>
+              <button class="generate-yaml-button" type="button" id="generateYaml" disabled><span data-i18n="generateYaml">Generate YAML</span><span aria-hidden="true">→</span></button>
+              <small class="engine-note" data-i18n="enginePending">The PDF and reference files are sent to Copilot for this conversion only.</small>
+            </aside>
+          </div>
+
+          <section class="yaml-result is-hidden" id="yamlResult" aria-live="polite">
+            <header class="yaml-result-header">
+              <div><span class="eyebrow" data-i18n="generatedArtifact">Generated artifact</span><div class="result-title-line"><h2 id="yamlFileName">architecture.yml</h2><span class="sample-badge generated-badge" data-i18n="generatedOutput">Copilot output</span></div></div>
+              <div class="result-actions">
+                <button class="quiet-button" type="button" id="copyYaml"><span aria-hidden="true">▣</span><span data-i18n="copyYaml">Copy</span></button>
+                <button class="quiet-button" type="button" id="downloadYaml"><span aria-hidden="true">↓</span><span data-i18n="downloadYaml">Download .yml</span></button>
+                <button class="sync-button" type="button" id="regenerateYaml"><span aria-hidden="true">↻</span><span data-i18n="regenerateYaml">Regenerate</span></button>
+              </div>
+            </header>
+            <div class="result-meta">
+              <div><span data-i18n="sourceDocument">Source document</span><strong id="yamlSourceDocument">—</strong></div>
+              <div><span data-i18n="sourcePages">Source pages</span><strong data-i18n="sourcePagesPending">Pending AI detection</strong></div>
+              <div><span data-i18n="generatedAt">Generated</span><strong id="yamlGeneratedAt">—</strong></div>
+            </div>
+            <div class="yaml-result-grid">
+              <div class="yaml-code-panel">
+                <div class="code-toolbar"><span>YAML</span><small id="yamlLineCount">0 lines</small></div>
+                <pre><code id="yamlPreview"></code></pre>
+              </div>
+            </div>
+          </section>
         </div>
       </section>
 
