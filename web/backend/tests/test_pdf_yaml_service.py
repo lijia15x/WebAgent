@@ -84,6 +84,10 @@ class PdfYamlServiceTests(unittest.TestCase):
         self.assertIn("Do not copy its limited topology", prompt)
         self.assertIn("Do not broaden the result beyond the authoritative target", prompt)
         self.assertIn("Do not invent", prompt)
+        self.assertIn("Mandatory command-line agent workflow", prompt)
+        self.assertIn("source_inventory.json", prompt)
+        self.assertIn("high-resolution full image plus overlapping 3x-5x crops", prompt)
+        self.assertIn("physical distribution layers that were collapsed or bypassed", prompt)
         self.assertIn("filtered.pdf", prompt)
         self.assertIn("guide.md", prompt)
         self.assertIn("example.yml", prompt)
@@ -251,6 +255,9 @@ class PdfYamlGenerationTests(unittest.IsolatedAsyncioTestCase):
         progress_events: list[tuple[str, int]] = []
         activity_events: list[str] = []
         process_events: list[str] = []
+        workspace_paths: list[Path] = []
+        first_page_count = 0
+        copied_guide_content = ""
 
         async def record_progress(stage: str, percent: int) -> None:
             progress_events.append((stage, percent))
@@ -270,6 +277,17 @@ class PdfYamlGenerationTests(unittest.IsolatedAsyncioTestCase):
             patch_response = '[{"op":"replace","path":"/elements/0/board","value":"board_a"}]'
             responses = [invalid, patch_response]
             async def fake_ask(*args, **kwargs):
+                nonlocal first_page_count, copied_guide_content
+                workspace = Path(kwargs["workspace"])
+                workspace_paths.append(workspace)
+                self.assertTrue(workspace.is_dir())
+                self.assertIn("temporary request workspace", kwargs["workspace_guidance"])
+                files = kwargs.get("files") or []
+                if files:
+                    self.assertTrue(all(Path(path).is_file() for path in files))
+                    with pymupdf.open(files[0]) as document:
+                        first_page_count = document.page_count
+                    copied_guide_content = Path(files[1]).read_text(encoding="utf-8")
                 callback = kwargs.get("on_delta")
                 if callback is not None:
                     callback("output started")
@@ -295,18 +313,21 @@ class PdfYamlGenerationTests(unittest.IsolatedAsyncioTestCase):
             first_files = ask.await_args_list[0].kwargs["files"]
             second_files = ask.await_args_list[1].kwargs["files"]
             repair_prompt = ask.await_args_list[1].args[0]
-            with pymupdf.open(first_files[0]) as document:
-                filtered_page_count = document.page_count
 
         self.assertEqual(yaml.safe_load(VALID_YAML), yaml.safe_load(content))
         self.assertTrue(validation["valid"])
         self.assertEqual(2, ask.await_count)
-        self.assertEqual(guide, first_files[1])
+        self.assertEqual("guide.md", first_files[1].name)
+        self.assertEqual("guide", copied_guide_content)
         self.assertEqual([], second_files)
+        self.assertEqual(900.0, ask.await_args_list[0].kwargs["timeout"])
+        self.assertEqual(300.0, ask.await_args_list[1].kwargs["timeout"])
         self.assertIn("minimal RFC 6902-style JSON patch", repair_prompt)
         self.assertIn("Never remove boards, elements, ports, or connections", repair_prompt)
         self.assertIn("_smbus_figures.pdf", first_files[0].name)
-        self.assertEqual(2, filtered_page_count)
+        self.assertEqual(2, first_page_count)
+        self.assertEqual(workspace_paths[0], workspace_paths[1])
+        self.assertTrue(all(not path.exists() for path in workspace_paths))
         stages = [stage for stage, _ in progress_events]
         distinct_stages = [stage for index, stage in enumerate(stages) if index == 0 or stage != stages[index - 1]]
         self.assertEqual(
@@ -322,6 +343,36 @@ class PdfYamlGenerationTests(unittest.IsolatedAsyncioTestCase):
             ["Tracing board connections against the selected architecture."],
             process_events,
         )
+
+    async def test_deletes_workspace_when_copilot_fails(self) -> None:
+        observed_workspace: Path | None = None
+
+        async def fail_ask(*args, **kwargs):
+            nonlocal observed_workspace
+            observed_workspace = Path(kwargs["workspace"])
+            self.assertTrue(observed_workspace.is_dir())
+            (observed_workspace / "analysis").mkdir()
+            (observed_workspace / "analysis" / "source_inventory.json").write_text(
+                "{}", encoding="utf-8"
+            )
+            raise RuntimeError("generation failed")
+
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source.pdf"
+            guide = Path(directory) / "guide.md"
+            write_architecture_pdf(source)
+            guide.write_text("guide", encoding="utf-8")
+            with (
+                patch(
+                    "pdf_to_yaml_agent.converter.ask_copilot",
+                    new=AsyncMock(side_effect=fail_ask),
+                ),
+                self.assertRaisesRegex(RuntimeError, "generation failed"),
+            ):
+                await generate_architecture_yaml(source, [guide])
+
+        self.assertIsNotNone(observed_workspace)
+        self.assertFalse(observed_workspace.exists())
 
     async def test_topology_warning_does_not_trigger_repair(self) -> None:
         topology_document = yaml.safe_load(VALID_YAML)

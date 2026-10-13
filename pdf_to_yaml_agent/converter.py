@@ -3,9 +3,12 @@ import copy
 import json
 import os
 import re
+import shutil
+import sys
 import time
 from collections import Counter, defaultdict
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any, Awaitable, Callable, Sequence
 
 import yaml
@@ -23,6 +26,9 @@ ID_PATTERN = re.compile(r"^[a-z0-9_]+$")
 ProgressCallback = Callable[[str, int], Awaitable[None]]
 ActivityCallback = Callable[[str], Awaitable[None]]
 ProcessCallback = Callable[[str], Awaitable[None]]
+PDF_WORKSPACE_GUIDANCE = """Use the temporary request workspace actively. You may create analysis files and run read-only inspection commands inside it. Do not modify the source PDF or files under references. Do not access files outside this workspace. All analysis artifacts are temporary and must not be mentioned in the final response."""
+DEFAULT_GENERATION_TIMEOUT_SECONDS = 900.0
+DEFAULT_REPAIR_TIMEOUT_SECONDS = 300.0
 
 
 class YamlGenerationError(RuntimeError):
@@ -39,10 +45,24 @@ def select_reference_files(reference_files: Sequence[Path]) -> list[Path]:
     return sorted(selected.values(), key=lambda path: path.name.casefold())
 
 
+def timeout_from_env(name: str, default: float) -> float:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    try:
+        timeout = float(raw_value)
+    except ValueError as exc:
+        raise YamlGenerationError(f"{name} must be a number of seconds") from exc
+    if timeout <= 0:
+        raise YamlGenerationError(f"{name} must be greater than zero")
+    return timeout
+
+
 def build_generation_prompt(
     source_name: str,
     reference_names: Sequence[str],
     selection: ArchitectureSelection,
+    python_executable: str = "python",
 ) -> str:
     references = ", ".join(reference_names)
     figures = "\n".join(
@@ -59,6 +79,14 @@ The authoritative target is: {selection.target.caption}
 The target figure is authoritative for architecture content and scope. When both modular and base SMBus architecture figures are attached, convert the modular figure and use the base figure only to clarify shared labels, part numbers, addresses, and visually ambiguous common paths. Do not copy base-figure connections that differ from the modular target. If no modular figure is available, convert the selected base SMBus architecture figure.
 
 The other attached files ({references}) are normative authoring and representation references. Follow their YAML schema, field choices, ID conventions, connection modeling, ordering conventions, and level of detail. An existing architecture YAML reference, including a .yml, .yaml, or YAML-formatted .txt file, is an example of how to represent the diagram; it is not authoritative for content scope. Do not copy its limited topology or stop at one example bus path. Add every source-supported board, element, port, and connection needed to represent the complete authoritative target figure.
+
+Mandatory command-line agent workflow before the final response:
+1. Inspect the workspace files and use `{python_executable}` with PyMuPDF to extract the PDF text layer, page dimensions, figure captions, and visible labels. Do not rely on a whole-page thumbnail alone.
+2. Render the authoritative target figure as a high-resolution full image plus overlapping 3x-5x crops covering every diagram region, including controllers, Aggregator or equivalent distribution logic, host modules, system boards, connector arrays, and lower or side detail panels. Inspect every crop.
+3. Create an analysis/source_inventory.json file. Inventory every visible board or module, controller, hub, mux, buffer, translator, connector, cable endpoint, target device, address, named port, and source-supported connection. Record the source page and crop for each fact. Connector-only boundaries, reserved channels, optional slots, and internal-only detail diagrams must be identified rather than silently discarded or forced into the main connected component.
+4. Build analysis/candidate.yml from that inventory. Then run a local Python audit that parses both source_inventory.json and candidate.yml. The audit must report inventory items and visible branches missing from the candidate, unresolved references, duplicate IDs, active hub or mux downstream ports with no represented destination, and physical distribution layers that were collapsed or bypassed.
+5. Return to the relevant crop for every audit finding. Correct source-supported omissions in candidate.yml; do not fabricate destinations that the figure does not show. Repeat the audit until every remaining exception is explicitly supported as reserved, optional, connector-only, or internal-only by the source.
+6. Read the final candidate.yml from disk and return that exact YAML as the response. Analysis files are temporary working artifacts, not output fields.
 
 Output requirements:
 - Return YAML only. Do not use Markdown fences, prose, JSON, or an explanation.
@@ -78,7 +106,7 @@ Output requirements:
 - Do not add source-page or figure-number tracking unless it already exists in the reference YAML.
 - Do not broaden the result beyond the authoritative target figure. Supporting base figures may clarify shared facts but must not expand or replace the target topology.
 
-Before responding, silently verify the complete output against the normative guide, including all IDs and connection references."""
+Before responding, verify the complete output against both the source inventory and the normative guide, including source coverage, all IDs, and all connection references."""
 
 
 def strip_yaml_fence(content: str) -> str:
@@ -518,6 +546,42 @@ async def generate_architecture_yaml(
     activity_callback: ActivityCallback | None = None,
     process_callback: ProcessCallback | None = None,
 ) -> tuple[str, dict[str, Any]]:
+    selected_references = select_reference_files(reference_files)
+    with TemporaryDirectory(
+        prefix="copilot-pdf-yaml-",
+        dir=source_pdf.parent,
+    ) as directory:
+        workspace = Path(directory)
+        workspace_source = workspace / source_pdf.name
+        shutil.copy2(source_pdf, workspace_source)
+        reference_directory = workspace / "references"
+        reference_directory.mkdir()
+        workspace_references: list[Path] = []
+        for reference in selected_references:
+            copied_reference = reference_directory / reference.name
+            shutil.copy2(reference, copied_reference)
+            workspace_references.append(copied_reference)
+
+        return await _generate_architecture_yaml_in_workspace(
+            workspace_source,
+            workspace_references,
+            workspace,
+            model=model,
+            progress_callback=progress_callback,
+            activity_callback=activity_callback,
+            process_callback=process_callback,
+        )
+
+
+async def _generate_architecture_yaml_in_workspace(
+    source_pdf: Path,
+    reference_files: Sequence[Path],
+    workspace: Path,
+    model: str | None = None,
+    progress_callback: ProgressCallback | None = None,
+    activity_callback: ActivityCallback | None = None,
+    process_callback: ProcessCallback | None = None,
+) -> tuple[str, dict[str, Any]]:
     async def report(stage: str, percent: int) -> None:
         if progress_callback is not None:
             await progress_callback(stage, percent)
@@ -542,6 +606,7 @@ async def generate_architecture_yaml(
         filtered_pdf.name,
         [path.name for path in selected_references],
         selection,
+        python_executable=sys.executable,
     )
     await report("generating", 25)
     await report_activity("context_ready")
@@ -591,8 +656,12 @@ async def generate_architecture_yaml(
         prompt,
         model=model or os.getenv("PDF_YAML_MODEL", "gpt-5.4-mini"),
         files=attachments,
-        workspace="",
-        timeout=300.0,
+        workspace=workspace,
+        workspace_guidance=PDF_WORKSPACE_GUIDANCE,
+        timeout=timeout_from_env(
+            "PDF_YAML_GENERATION_TIMEOUT_SECONDS",
+            DEFAULT_GENERATION_TIMEOUT_SECONDS,
+        ),
         on_delta=report_output_activity,
         on_process_delta=report_process_activity,
         on_activity=report_tool_activity,
@@ -625,8 +694,12 @@ async def generate_architecture_yaml(
         build_repair_prompt(candidate, validation["errors"]),
         model=model or os.getenv("PDF_YAML_MODEL", "gpt-5.4-mini"),
         files=[],
-        workspace="",
-        timeout=180.0,
+        workspace=workspace,
+        workspace_guidance=PDF_WORKSPACE_GUIDANCE,
+        timeout=timeout_from_env(
+            "PDF_YAML_REPAIR_TIMEOUT_SECONDS",
+            DEFAULT_REPAIR_TIMEOUT_SECONDS,
+        ),
     )
     await report("revalidating", 95)
     repaired_document = apply_repair_patch(original_document, patch_content)

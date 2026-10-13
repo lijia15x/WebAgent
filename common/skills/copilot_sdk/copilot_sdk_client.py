@@ -58,6 +58,7 @@ async def ask_copilot(
     model: str = "auto",
     files: Optional[Sequence[Union[str, Path]]] = None,
     workspace: Optional[Union[str, Path]] = None,
+    workspace_guidance: Optional[str] = None,
     timeout: float = 300.0,
     on_delta: Optional[Callable[[str], None]] = None,
     on_process_delta: Optional[Callable[[str], None]] = None,
@@ -105,14 +106,14 @@ async def ask_copilot(
 
     effective_prompt = prompt
     if working_directory:
-        effective_prompt = (
-            f"{prompt}\n\n"
+        guidance = workspace_guidance or (
             "Before answering, use targeted text searches for test names, stack "
             "trace symbols, and component names from the attached log, then read "
             "only the most relevant workspace files. Do not scan or index the "
             "entire workspace. Use the code as evidence, cite relevant file paths, "
             "and do not modify any workspace files."
         )
+        effective_prompt = f"{prompt}\n\n{guidance.strip()}"
 
     client = copilot_module.CopilotClient()
     await client.start()
