@@ -31,13 +31,16 @@ connections: []
 
 class PdfYamlServiceTests(unittest.TestCase):
     def test_prompt_enforces_guide_shape_and_no_invention(self) -> None:
-        prompt = build_generation_prompt("source.pdf", ["guide.md"])
+        prompt = build_generation_prompt("source.pdf", ["guide.md", "example.yml"])
 
-        self.assertIn("authoritative target for output scope", prompt)
-        self.assertIn("Do not broaden", prompt)
+        self.assertIn('Figure 12-7, "Johnson City Modular SMBus architecture"', prompt)
+        self.assertIn("not authoritative for content scope", prompt)
+        self.assertIn("do not limit extraction to SMB_MPIC / SMB C[10]", prompt)
+        self.assertIn("Do not broaden the result beyond Figure 12-7", prompt)
         self.assertIn("Do not invent", prompt)
         self.assertIn("source.pdf", prompt)
         self.assertIn("guide.md", prompt)
+        self.assertIn("example.yml", prompt)
 
     def test_strips_yaml_markdown_fence(self) -> None:
         self.assertEqual(VALID_YAML.strip(), strip_yaml_fence(f"```yaml\n{VALID_YAML}```"))

@@ -18,17 +18,18 @@ class YamlGenerationError(RuntimeError):
 
 def build_generation_prompt(source_name: str, reference_names: Sequence[str]) -> str:
     references = ", ".join(reference_names)
-    return f"""Convert the attached architecture source PDF, {source_name}, into a compliant board-level I2C/I3C architecture YAML file.
+    return f"""Convert Figure 12-7, "Johnson City Modular SMBus architecture", from the attached source PDF, {source_name}, into a compliant board-level I2C/I3C architecture YAML file.
 
-The other attached files ({references}) are normative authoring references. Follow them exactly. When a reference and the source PDF differ, use the reference for YAML structure and the source PDF for architecture facts.
+The source PDF is authoritative for architecture content and scope. Extract the complete architecture shown in Figure 12-7, not a single bus path or a subset of the figure.
 
-If an attached reference is an existing architecture YAML file, including a .yml, .yaml, or YAML-formatted .txt file, treat it as the authoritative target for output scope and representation. Preserve its boards, elements, ports, connections, IDs, field choices, comments, ordering, and level of detail. Use the source PDF only to verify those facts. Do not add architecture content outside that reference YAML's scope.
+The other attached files ({references}) are normative authoring and representation references. Follow their YAML schema, field choices, ID conventions, connection modeling, ordering conventions, and level of detail. An existing architecture YAML reference, including a .yml, .yaml, or YAML-formatted .txt file, is an example of how to represent the diagram; it is not authoritative for content scope. Do not copy its limited topology or stop at its SMB_MPIC / SMB C[10] path. Add every source-supported board, element, port, and connection needed to represent the complete Figure 12-7 architecture.
 
 Output requirements:
 - Return YAML only. Do not use Markdown fences, prose, JSON, or an explanation.
 - Use exactly these top-level keys in this order: version, boards, elements, connections.
 - Set version to 1.
-- When an architecture YAML reference is attached, include the same architecture content and scope as that reference. Otherwise, include the architecture described by the relevant source diagram.
+- Include all board and module boundaries, SMBus/I2C/I3C controllers, hubs, muxes, buffers, translators, connectors, cables, and endpoint devices visibly represented in Figure 12-7.
+- Include every visible bus branch in Figure 12-7, including all source-supported AST2600 SMB and I3C controller paths; do not limit extraction to SMB_MPIC / SMB C[10].
 - Model each physical or logical hop as a separate connection.
 - Use lowercase snake_case for generated IDs. Board and element IDs must be globally unique where required; port IDs must be unique within their element.
 - Every element.board must resolve to a declared board.
@@ -39,7 +40,7 @@ Output requirements:
 - Omit optional values that cannot be established from the source. Do not invent addresses, voltage domains, speeds, cable lengths, part numbers, signals, labels, or electrical roles.
 - Do not add source, metadata, review, notes, confidence, or other custom top-level sections.
 - Do not add source-page or figure-number tracking unless it already exists in the reference YAML.
-- Do not broaden the result to other diagrams or sections in the PDF.
+- Do not broaden the result beyond Figure 12-7 into Figure 12-6, Figure 12-8, or other diagrams and sections in the PDF.
 
 Before responding, silently verify the complete output against the normative guide, including all IDs and connection references."""
 
@@ -188,7 +189,7 @@ Candidate:
 {candidate}
 ```
 
-Return the complete corrected YAML only, without Markdown fences or explanation. Preserve source-supported architecture facts, do not invent missing facts, and use exactly the top-level keys version, boards, elements, connections."""
+Return the complete corrected YAML only, without Markdown fences or explanation. Preserve the complete Figure 12-7 Johnson City Modular SMBus architecture, not only the SMB_MPIC / SMB C[10] path. Preserve source-supported architecture facts, do not invent missing facts, and use exactly the top-level keys version, boards, elements, connections."""
 
 
 async def generate_architecture_yaml(
