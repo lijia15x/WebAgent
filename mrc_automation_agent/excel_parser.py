@@ -127,16 +127,18 @@ def parse_workbook(workbook: WorkbookFile, header_search_rows: int) -> list[Proj
                         return ""
                     return str(values[column] or "").strip()
 
-                project_name = value("project_name")
-                if not project_name:
-                    continue
                 function_team = value("function_team")
-                if function_team:
-                    current_function_team = function_team
                 owner_name = value("owner_name")
                 owner_emails = _email_addresses(value("owner_email"))
                 if not owner_emails:
                     owner_emails = _email_addresses(owner_name)
+                project_name = value("project_name")
+                if not project_name and function_team and (owner_name or owner_emails):
+                    project_name = function_team
+                if not project_name:
+                    continue
+                if function_team:
+                    current_function_team = function_team
                 if owner_emails and not value("owner_email"):
                     owner_name = ""
                 for owner_email in owner_emails or [""]:
@@ -160,3 +162,4 @@ def parse_workbook(workbook: WorkbookFile, header_search_rows: int) -> list[Proj
         return records
     finally:
         excel.close()
+

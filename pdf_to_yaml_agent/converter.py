@@ -200,7 +200,7 @@ async def generate_architecture_yaml(
     prompt = build_generation_prompt(source_pdf.name, [path.name for path in reference_files])
     content = await ask_copilot(
         prompt,
-        model=model or os.getenv("PDF_YAML_MODEL", "gpt-5.5"),
+        model=model or os.getenv("PDF_YAML_MODEL", "gpt-5.6-sol"),
         files=attachments,
         workspace="",
         timeout=600.0,
@@ -212,7 +212,7 @@ async def generate_architecture_yaml(
 
     repaired = await ask_copilot(
         build_repair_prompt(candidate, validation["errors"]),
-        model=model or os.getenv("PDF_YAML_MODEL", "gpt-5.5"),
+        model=model or os.getenv("PDF_YAML_MODEL", "gpt-5.6-sol"),
         files=attachments,
         workspace="",
         timeout=600.0,

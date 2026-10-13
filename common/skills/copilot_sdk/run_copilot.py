@@ -15,7 +15,7 @@ def main() -> int:
     parser.add_argument("--file", action="append", default=[])
     parser.add_argument("--workspace")
     parser.add_argument(
-        "--model", default=os.getenv("LOG_ANALYSIS_MODEL", "gpt-5.5")
+        "--model", default=os.getenv("LOG_ANALYSIS_MODEL", "gpt-5.6-sol")
     )
     parser.add_argument("--timeout", type=float, default=300.0)
     arguments = parser.parse_args()

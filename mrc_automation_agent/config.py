@@ -26,7 +26,7 @@ class MrcConfig:
     smtp_server: str = ""
     smtp_port: int = 587
     header_search_rows: int = 10
-    ppt_model: str = "gpt-5.5"
+    ppt_model: str = "gpt-5.6-sol"
 
     @classmethod
     def from_env(cls) -> "MrcConfig":
@@ -45,7 +45,7 @@ class MrcConfig:
             smtp_server=os.getenv("MRC_SMTP_SERVER", ""),
             smtp_port=int(os.getenv("MRC_SMTP_PORT", "587")),
             header_search_rows=int(os.getenv("MRC_HEADER_SEARCH_ROWS", "10")),
-            ppt_model=os.getenv("MRC_PPT_MODEL", "gpt-5.5"),
+            ppt_model=os.getenv("MRC_PPT_MODEL", "gpt-5.6-sol"),
         )
 
     def require_sharepoint(self) -> None:

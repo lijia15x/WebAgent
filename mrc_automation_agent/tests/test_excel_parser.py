@@ -62,6 +62,51 @@ class ExcelParserTests(unittest.TestCase):
         self.assertEqual("Platform Health", records[0].function_team)
         self.assertEqual("On track", records[0].status_comments)
 
+    def test_uses_merged_platform_health_as_project_for_each_owner(self) -> None:
+        excel = Workbook()
+        sheet = excel.active
+        sheet.append(
+            [
+                None,
+                "Platform:\nOKS-AP",
+                "uPLC: Mid Design Entry",
+                "Owner",
+                "Status Comments",
+            ]
+        )
+        sheet.append(
+            [
+                None,
+                "Platform Health",
+                None,
+                "first@example.com\nsecond@example.com",
+                "On track",
+            ]
+        )
+        sheet.merge_cells("B2:C2")
+        content = BytesIO()
+        excel.save(content)
+
+        records = parse_workbook(
+            WorkbookFile(
+                "DMR Dashboard WW43'26.xlsx",
+                "https://example.invalid/DMR.xlsx",
+                content.getvalue(),
+            ),
+            header_search_rows=10,
+        )
+
+        self.assertEqual(2, len(records))
+        self.assertEqual(
+            ["first@example.com", "second@example.com"],
+            [record.owner_email for record in records],
+        )
+        self.assertTrue(
+            all(record.project_name == "Platform Health" for record in records)
+        )
+        self.assertTrue(
+            all(record.function_team == "Platform Health" for record in records)
+        )
     def test_uses_current_week_status_instead_of_history(self) -> None:
         excel = Workbook()
         sheet = excel.active
@@ -218,3 +263,4 @@ class ExcelParserTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
