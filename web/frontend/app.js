@@ -179,6 +179,11 @@ const translations = {
     enterValidAddress: "请输入有效的 SharePoint 地址",
     pdfSelected: "已选择 PDF 文件",
     invalidPdf: "请选择 PDF 文件",
+    preparingPdf: "正在上传并定位架构图",
+    filteringPdf: "正在精简 PDF",
+    pdfPrepared: "精简 PDF 已就绪",
+    pdfPreparationFailed: "PDF 精简失败",
+    preparedPdfDownloaded: "精简 PDF 已下载",
     referenceAdded: "参考文件已添加",
     invalidReference: "仅支持 Markdown、PDF、YAML 或文本参考文件",
     referenceLoadFailed: "无法加载服务器参考文件",
@@ -197,7 +202,27 @@ const translations = {
     yamlCopied: "YAML 已复制",
     yamlDownloaded: "YAML 文件已下载",
     generatingYaml: "Copilot 正在生成…",
+    generationReady: "等待生成",
+    generationStarting: "正在启动生成任务",
+    generationFiltering: "正在读取架构图",
+    generationGenerating: "Copilot 正在提取拓扑",
+    generationValidating: "正在校验 YAML",
+    generationRepairing: "正在自动修复 YAML",
+    generationRevalidating: "正在校验修复结果",
+    generationCompleted: "生成并校验完成",
+    generationReviewRequired: "已生成，需要复核拓扑警告",
+    generationFailed: "生成失败",
+    elapsedTime: "已用时间",
+    copilotActivity: "Copilot 运行动态",
+    copilotWaiting: "等待开始",
+    activityContextReady: "已提交精简架构图和参考文件",
+    activityAnalyzing: "Copilot 正在分析板卡、器件和连接",
+    activityInspectingInputs: "Copilot 正在检查输入内容",
+    activityWritingYaml: "Copilot 正在生成 YAML",
+    activityResponseReceived: "已收到 Copilot 输出，准备校验",
+    activityRepairingYaml: "Copilot 正在生成最小修复补丁",
     yamlGenerated: "YAML 已生成并通过校验",
+    yamlReviewRequired: "YAML 结构有效，但存在需要复核的拓扑警告",
     yamlGenerationFailed: "YAML 生成失败",
   },
   en: {
@@ -374,6 +399,11 @@ const translations = {
     enterValidAddress: "Enter a valid SharePoint address",
     pdfSelected: "PDF selected",
     invalidPdf: "Choose a PDF file",
+    preparingPdf: "Uploading and locating architecture figures",
+    filteringPdf: "Reducing PDF",
+    pdfPrepared: "Reduced PDF ready",
+    pdfPreparationFailed: "PDF reduction failed",
+    preparedPdfDownloaded: "Reduced PDF downloaded",
     referenceAdded: "Reference files added",
     invalidReference: "Only Markdown, PDF, YAML or text reference files are supported",
     referenceLoadFailed: "Unable to load server reference files",
@@ -392,7 +422,27 @@ const translations = {
     yamlCopied: "YAML copied",
     yamlDownloaded: "YAML file downloaded",
     generatingYaml: "Copilot is generating…",
+    generationReady: "Ready to generate",
+    generationStarting: "Starting generation",
+    generationFiltering: "Reading architecture figures",
+    generationGenerating: "Copilot is extracting topology",
+    generationValidating: "Validating YAML",
+    generationRepairing: "Automatically repairing YAML",
+    generationRevalidating: "Validating repaired YAML",
+    generationCompleted: "Generation and validation complete",
+    generationReviewRequired: "Generated; topology review required",
+    generationFailed: "Generation failed",
+    elapsedTime: "Elapsed time",
+    copilotActivity: "Copilot activity",
+    copilotWaiting: "Waiting to start",
+    activityContextReady: "Reduced architecture and references submitted",
+    activityAnalyzing: "Copilot is analyzing boards, elements, and connections",
+    activityInspectingInputs: "Copilot is inspecting the input",
+    activityWritingYaml: "Copilot is generating YAML",
+    activityResponseReceived: "Copilot response received; validation is next",
+    activityRepairingYaml: "Copilot is preparing a minimal repair patch",
     yamlGenerated: "YAML generated and validated",
+    yamlReviewRequired: "YAML structure is valid, but topology warnings require review",
     yamlGenerationFailed: "YAML generation failed",
   },
 };
@@ -801,15 +851,78 @@ const sharePointAddress = document.querySelector("#sharePointAddress");
 const sharePointSavedState = document.querySelector("#sharePointSavedState");
 const architecturePdfInput = document.querySelector("#architecturePdfInput");
 const selectedPdf = document.querySelector("#selectedPdf");
+const pdfPreparation = document.querySelector("#pdfPreparation");
+const pdfPreparationStatus = document.querySelector("#pdfPreparationStatus");
+const pdfPreparationPercent = document.querySelector("#pdfPreparationPercent");
+const pdfPreparationBar = document.querySelector("#pdfPreparationBar");
 const referenceFilesInput = document.querySelector("#referenceFilesInput");
 const referenceFileList = document.querySelector("#referenceFileList");
 const generateYamlButton = document.querySelector("#generateYaml");
+const regenerateYamlButton = document.querySelector("#regenerateYaml");
+const generationStatus = document.querySelector("#generationStatus");
+const generationPercent = document.querySelector("#generationPercent");
+const generationProgressBar = document.querySelector("#generationProgressBar");
+const generationTimer = document.querySelector("#generationTimer");
+const copilotActivityDot = document.querySelector("#copilotActivityDot");
+const copilotActivityList = document.querySelector("#copilotActivityList");
+const generationSteps = Array.from(document.querySelectorAll("[data-generation-step]"));
 const yamlResult = document.querySelector("#yamlResult");
 const yamlPreview = document.querySelector("#yamlPreview");
 let architecturePdf;
+let preparedPdfName = "";
+let preparedPdfPages = "";
+let preparedPdfUrl = "";
+let pdfPreparationRequest;
 let referenceFiles = [];
 let generatedYaml = "";
 let generatedFileName = "architecture.yml";
+let generationStartedAt;
+let generationTimerId;
+
+const copilotActivityKeys = {
+  context_ready: "activityContextReady",
+  analyzing: "activityAnalyzing",
+  inspecting_inputs: "activityInspectingInputs",
+  writing_yaml: "activityWritingYaml",
+  response_received: "activityResponseReceived",
+  repairing_yaml: "activityRepairingYaml",
+};
+
+function resetCopilotActivity() {
+  copilotActivityList.replaceChildren();
+  const item = document.createElement("li");
+  item.dataset.i18n = "copilotWaiting";
+  item.textContent = t("copilotWaiting");
+  copilotActivityList.append(item);
+}
+
+function appendCopilotActivity(activity) {
+  const key = copilotActivityKeys[activity];
+  if (!key) return;
+  const message = t(key);
+  if (copilotActivityList.lastElementChild?.textContent === message) return;
+  if (copilotActivityList.children.length === 1 && copilotActivityList.firstElementChild?.dataset.i18n === "copilotWaiting") {
+    copilotActivityList.replaceChildren();
+  }
+  const item = document.createElement("li");
+  item.dataset.i18n = key;
+  item.textContent = message;
+  copilotActivityList.append(item);
+  while (copilotActivityList.children.length > 4) copilotActivityList.firstElementChild.remove();
+}
+
+function appendCopilotProcess(message) {
+  const text = String(message || "").replace(/\s+/g, " ").trim().slice(0, 180);
+  if (!text || copilotActivityList.lastElementChild?.textContent === text) return;
+  if (copilotActivityList.children.length === 1 && copilotActivityList.firstElementChild?.dataset.i18n === "copilotWaiting") {
+    copilotActivityList.replaceChildren();
+  }
+  const item = document.createElement("li");
+  item.className = "is-process";
+  item.textContent = text;
+  copilotActivityList.append(item);
+  while (copilotActivityList.children.length > 4) copilotActivityList.firstElementChild.remove();
+}
 
 function formatFileSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
@@ -818,7 +931,170 @@ function formatFileSize(bytes) {
 }
 
 function updateConversionAvailability() {
-  generateYamlButton.disabled = !architecturePdf || generateYamlButton.classList.contains("is-loading");
+  generateYamlButton.disabled = !architecturePdf || Boolean(pdfPreparationRequest) || generateYamlButton.classList.contains("is-loading");
+}
+
+function formatElapsed(milliseconds) {
+  const seconds = Math.max(0, Math.floor(milliseconds / 1000));
+  return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+function startGenerationTimer() {
+  window.clearInterval(generationTimerId);
+  generationStartedAt = performance.now();
+  const renderElapsed = () => {
+    generationTimer.textContent = formatElapsed(performance.now() - generationStartedAt);
+  };
+  renderElapsed();
+  generationTimerId = window.setInterval(renderElapsed, 1000);
+}
+
+function stopGenerationTimer() {
+  if (generationStartedAt !== undefined) {
+    generationTimer.textContent = formatElapsed(performance.now() - generationStartedAt);
+  }
+  window.clearInterval(generationTimerId);
+  generationTimerId = undefined;
+}
+
+function updateGenerationProgress(stage, percent) {
+  const statusKeys = {
+    starting: "generationStarting",
+    filtering: "generationFiltering",
+    generating: "generationGenerating",
+    validating: "generationValidating",
+    repairing: "generationRepairing",
+    revalidating: "generationRevalidating",
+    completed: "generationCompleted",
+    review_required: "generationReviewRequired",
+    failed: "generationFailed",
+  };
+  const activeSteps = { starting: 0, filtering: 0, generating: 1, repairing: 1, validating: 2, revalidating: 2, completed: 3, review_required: 3, failed: -1 };
+  const normalized = Math.max(0, Math.min(100, Math.round(percent)));
+  const statusKey = statusKeys[stage] || "generationStarting";
+  generationStatus.dataset.i18n = statusKey;
+  generationStatus.textContent = t(statusKey);
+  generationPercent.textContent = `${normalized}%`;
+  generationProgressBar.style.width = `${normalized}%`;
+  document.querySelector("#generationProgress").classList.toggle("is-error", stage === "failed");
+  const activeStep = activeSteps[stage];
+  generationSteps.forEach((step, index) => {
+    step.classList.toggle("is-active", index === activeStep);
+    step.classList.toggle("is-complete", activeStep === 3 || (activeStep >= 0 && index < activeStep));
+  });
+}
+
+async function readGenerationStream(response) {
+  if (!response.ok) {
+    const payload = await response.json();
+    throw new Error(payload.detail || t("yamlGenerationFailed"));
+  }
+  if (!response.body) throw new Error(t("yamlGenerationFailed"));
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let result;
+  while (true) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const event = JSON.parse(line);
+      if (event.type === "progress") updateGenerationProgress(event.stage, event.percent);
+      if (event.type === "activity") appendCopilotActivity(event.activity);
+      if (event.type === "process") appendCopilotProcess(event.message);
+      if (event.type === "error") throw new Error(event.detail || t("yamlGenerationFailed"));
+      if (event.type === "result") result = event;
+    }
+    if (done) break;
+  }
+  if (buffer.trim()) {
+    const event = JSON.parse(buffer);
+    if (event.type === "activity") appendCopilotActivity(event.activity);
+    if (event.type === "process") appendCopilotProcess(event.message);
+    if (event.type === "error") throw new Error(event.detail || t("yamlGenerationFailed"));
+    if (event.type === "result") result = event;
+  }
+  if (!result) throw new Error(t("yamlGenerationFailed"));
+  return result;
+}
+
+function updatePdfPreparation(percent, statusKey) {
+  const normalized = Math.max(0, Math.min(100, Math.round(percent)));
+  pdfPreparation.classList.remove("is-hidden");
+  pdfPreparationPercent.textContent = `${normalized}%`;
+  pdfPreparationBar.style.width = `${normalized}%`;
+  if (statusKey) {
+    pdfPreparationStatus.dataset.i18n = statusKey;
+    pdfPreparationStatus.textContent = t(statusKey);
+  }
+}
+
+function decodeResponseHeader(request, name, fallback = "") {
+  const value = request.getResponseHeader(name);
+  return value ? decodeURIComponent(value) : fallback;
+}
+
+function clearPreparedPdfUrl() {
+  if (preparedPdfUrl) URL.revokeObjectURL(preparedPdfUrl);
+  preparedPdfUrl = "";
+  const download = document.querySelector("#downloadPreparedPdf");
+  download.href = "#";
+  download.removeAttribute("download");
+}
+
+function prepareArchitecturePdf(file) {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    pdfPreparationRequest = request;
+    request.open("POST", "/api/agents/pdf-yaml/prepare");
+    request.responseType = "blob";
+    request.upload.addEventListener("progress", event => {
+      if (event.lengthComputable) updatePdfPreparation((event.loaded / event.total) * 90, "preparingPdf");
+    });
+    request.upload.addEventListener("load", () => updatePdfPreparation(92, "filteringPdf"));
+    request.addEventListener("load", async () => {
+      pdfPreparationRequest = undefined;
+      if (request.status < 200 || request.status >= 300) {
+        let message = t("pdfPreparationFailed");
+        try {
+          const payload = JSON.parse(await request.response.text());
+          message = payload.detail || message;
+        } catch {
+          // Keep the localized fallback when the server did not return JSON.
+        }
+        reject(new Error(message));
+        return;
+      }
+      preparedPdfName = decodeResponseHeader(request, "X-Prepared-Name", `${file.name.replace(/\.pdf$/i, "")}_smbus_figures.pdf`);
+      preparedPdfPages = request.getResponseHeader("X-Architecture-Pages") || "";
+      const product = decodeResponseHeader(request, "X-Architecture-Product");
+      architecturePdf = new File([request.response], file.name, { type: "application/pdf" });
+      preparedPdfUrl = URL.createObjectURL(architecturePdf);
+      const download = document.querySelector("#downloadPreparedPdf");
+      download.href = preparedPdfUrl;
+      download.download = preparedPdfName;
+      document.querySelector("#selectedPdfName").textContent = preparedPdfName;
+      document.querySelector("#selectedPdfMeta").textContent = [formatFileSize(architecturePdf.size), product, preparedPdfPages ? `pages ${preparedPdfPages}` : ""].filter(Boolean).join(" · ");
+      selectedPdf.classList.remove("is-hidden");
+      updatePdfPreparation(100, "pdfPrepared");
+      updateConversionAvailability();
+      resolve();
+    });
+    request.addEventListener("error", () => {
+      pdfPreparationRequest = undefined;
+      reject(new Error(t("pdfPreparationFailed")));
+    });
+    request.addEventListener("abort", () => {
+      pdfPreparationRequest = undefined;
+      updateConversionAvailability();
+    });
+    const form = new FormData();
+    form.append("pdf", file, file.name);
+    request.send(form);
+  });
 }
 
 function restorePdfWorkspace() {
@@ -902,7 +1178,7 @@ sharePointAddress.addEventListener("input", () => {
   updateConversionAvailability();
 });
 
-architecturePdfInput.addEventListener("change", () => {
+architecturePdfInput.addEventListener("change", async () => {
   const file = architecturePdfInput.files[0];
   if (!file) return;
   if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
@@ -910,19 +1186,45 @@ architecturePdfInput.addEventListener("change", () => {
     showToast(t("invalidPdf"));
     return;
   }
-  architecturePdf = file;
-  document.querySelector("#selectedPdfName").textContent = file.name;
-  document.querySelector("#selectedPdfMeta").textContent = formatFileSize(file.size);
-  selectedPdf.classList.remove("is-hidden");
+  if (pdfPreparationRequest) pdfPreparationRequest.abort();
+  clearPreparedPdfUrl();
+  architecturePdf = undefined;
+  preparedPdfName = "";
+  preparedPdfPages = "";
+  selectedPdf.classList.add("is-hidden");
+  updatePdfPreparation(0, "preparingPdf");
   updateConversionAvailability();
-  showToast(t("pdfSelected"));
+  try {
+    await prepareArchitecturePdf(file);
+    showToast(t("pdfPrepared"));
+  } catch (error) {
+    architecturePdf = undefined;
+    updatePdfPreparation(0, "pdfPreparationFailed");
+    showToast(error.message || t("pdfPreparationFailed"));
+  } finally {
+    architecturePdfInput.value = "";
+    updateConversionAvailability();
+  }
 });
 
 document.querySelector("#removePdf").addEventListener("click", () => {
+  if (pdfPreparationRequest) pdfPreparationRequest.abort();
+  clearPreparedPdfUrl();
   architecturePdf = undefined;
+  preparedPdfName = "";
+  preparedPdfPages = "";
   architecturePdfInput.value = "";
   selectedPdf.classList.add("is-hidden");
+  pdfPreparation.classList.add("is-hidden");
   updateConversionAvailability();
+});
+
+document.querySelector("#downloadPreparedPdf").addEventListener("click", event => {
+  if (!architecturePdf) {
+    event.preventDefault();
+    return;
+  }
+  showToast(t("preparedPdfDownloaded"));
 });
 
 referenceFilesInput.addEventListener("change", async () => {
@@ -977,12 +1279,16 @@ function renderGeneratedYaml(payload) {
   generatedFileName = payload.file_name;
   document.querySelector("#yamlFileName").textContent = generatedFileName;
   document.querySelector("#yamlSourceDocument").textContent = payload.source_file;
+  const sourcePages = document.querySelector("#yamlSourcePages");
+  if (sourcePages && preparedPdfPages) sourcePages.textContent = preparedPdfPages;
   document.querySelector("#yamlGeneratedAt").textContent = new Date().toLocaleString(currentLanguage === "zh" ? "zh-CN" : "en-US");
   document.querySelector("#yamlLineCount").textContent = `${generatedYaml.trimEnd().split("\n").length} lines`;
   yamlPreview.innerHTML = highlightYaml(generatedYaml);
   yamlResult.classList.remove("is-hidden");
   yamlResult.scrollIntoView({ behavior: "smooth", block: "start" });
-  showToast(t("yamlGenerated"));
+  const reviewRequired = Boolean(payload.validation?.review_required);
+  if (reviewRequired) updateGenerationProgress("review_required", 100);
+  showToast(t(reviewRequired ? "yamlReviewRequired" : "yamlGenerated"));
 }
 
 async function generateYaml() {
@@ -994,17 +1300,25 @@ async function generateYaml() {
   form.append("pdf", architecturePdf, architecturePdf.name);
   generateYamlButton.classList.add("is-loading");
   generateYamlButton.querySelector("span").textContent = t("generatingYaml");
+  regenerateYamlButton.disabled = true;
+  updateGenerationProgress("starting", 0);
+  resetCopilotActivity();
+  copilotActivityDot.classList.add("is-running");
+  startGenerationTimer();
   updateConversionAvailability();
   try {
-    const response = await fetch("/api/agents/pdf-yaml/generate", { method: "POST", body: form });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.detail || t("yamlGenerationFailed"));
+    const response = await fetch("/api/agents/pdf-yaml/generate-stream", { method: "POST", body: form });
+    const payload = await readGenerationStream(response);
     renderGeneratedYaml(payload);
   } catch (error) {
+    updateGenerationProgress("failed", Number.parseInt(generationPercent.textContent, 10) || 0);
     showToast(error.message || t("yamlGenerationFailed"));
   } finally {
+    stopGenerationTimer();
+    copilotActivityDot.classList.remove("is-running");
     generateYamlButton.classList.remove("is-loading");
     generateYamlButton.querySelector("span").textContent = t("generateYaml");
+    regenerateYamlButton.disabled = false;
     updateConversionAvailability();
   }
 }
@@ -1035,7 +1349,7 @@ function downloadGeneratedYaml() {
 }
 
 generateYamlButton.addEventListener("click", generateYaml);
-document.querySelector("#regenerateYaml").addEventListener("click", generateYaml);
+regenerateYamlButton.addEventListener("click", generateYaml);
 document.querySelector("#copyYaml").addEventListener("click", copyGeneratedYaml);
 document.querySelector("#downloadYaml").addEventListener("click", downloadGeneratedYaml);
 

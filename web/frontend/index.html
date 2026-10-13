@@ -195,8 +195,12 @@
                   <strong data-i18n="choosePdf">Choose an architecture PDF</strong>
                   <small data-i18n="pdfUploadHint">PDF only · one document per conversion</small>
                 </label>
+                <div class="pdf-preparation is-hidden" id="pdfPreparation" aria-live="polite">
+                  <div><span id="pdfPreparationStatus" data-i18n="preparingPdf">Uploading and locating architecture figures</span><strong id="pdfPreparationPercent">0%</strong></div>
+                  <div class="pdf-progress-track"><span id="pdfPreparationBar"></span></div>
+                </div>
                 <div class="selected-pdf is-hidden" id="selectedPdf">
-                  <span class="file-type">PDF</span><div><strong id="selectedPdfName"></strong><small id="selectedPdfMeta"></small></div><button class="icon-button" type="button" id="removePdf" aria-label="Remove PDF" title="Remove">×</button>
+                  <span class="file-type">PDF</span><div><strong id="selectedPdfName"></strong><small id="selectedPdfMeta"></small></div><a class="icon-button" id="downloadPreparedPdf" href="#" download aria-label="Download prepared PDF" title="Download prepared PDF">↓</a><button class="icon-button" type="button" id="removePdf" aria-label="Remove PDF" title="Remove">×</button>
                 </div>
               </article>
 
@@ -213,12 +217,21 @@
               <span class="eyebrow" data-i18n="conversionRun">Conversion run</span>
               <h3 data-i18n="generateYaml">Generate YAML</h3>
               <div class="conversion-flow">
-                <div><span>1</span><p><strong data-i18n="readDocument">Read document</strong><small data-i18n="readDocumentDetail">Locate architecture diagrams</small></p></div>
-                <div><span>2</span><p><strong data-i18n="extractTopology">Extract topology</strong><small data-i18n="extractTopologyDetail">Boards, elements, ports, connections</small></p></div>
-                <div><span>3</span><p><strong data-i18n="validateYaml">Validate YAML</strong><small data-i18n="validateYamlDetail">Schema and traceability checks</small></p></div>
+                <div data-generation-step="0"><span>1</span><p><strong data-i18n="readDocument">Read document</strong><small data-i18n="readDocumentDetail">Locate architecture diagrams</small></p></div>
+                <div data-generation-step="1"><span>2</span><p><strong data-i18n="extractTopology">Extract topology</strong><small data-i18n="extractTopologyDetail">Boards, elements, ports, connections</small></p></div>
+                <div data-generation-step="2"><span>3</span><p><strong data-i18n="validateYaml">Validate YAML</strong><small data-i18n="validateYamlDetail">Schema and traceability checks</small></p></div>
               </div>
               <div class="run-requirement"><span>!</span><p data-i18n="runRequirement">Choose a local PDF to prepare a conversion.</p></div>
               <button class="generate-yaml-button" type="button" id="generateYaml" disabled><span data-i18n="generateYaml">Generate YAML</span><span aria-hidden="true">→</span></button>
+              <div class="generation-progress" id="generationProgress" aria-live="polite">
+                <div class="generation-progress-heading"><span id="generationStatus" data-i18n="generationReady">Ready to generate</span><strong id="generationPercent">0%</strong></div>
+                <div class="generation-progress-track"><span id="generationProgressBar"></span></div>
+                <div class="generation-timer"><span data-i18n="elapsedTime">Elapsed time</span><strong id="generationTimer">00:00</strong></div>
+                <div class="copilot-activity">
+                  <div class="copilot-activity-heading"><span class="copilot-activity-dot" id="copilotActivityDot" aria-hidden="true"></span><strong data-i18n="copilotActivity">Copilot activity</strong></div>
+                  <ol id="copilotActivityList" aria-live="polite"><li data-i18n="copilotWaiting">Waiting to start</li></ol>
+                </div>
+              </div>
               <small class="engine-note" data-i18n="enginePending">The PDF and reference files are sent to Copilot for this conversion only.</small>
             </aside>
           </div>
@@ -234,7 +247,7 @@
             </header>
             <div class="result-meta">
               <div><span data-i18n="sourceDocument">Source document</span><strong id="yamlSourceDocument">—</strong></div>
-              <div><span data-i18n="sourcePages">Source pages</span><strong data-i18n="sourcePagesPending">Pending AI detection</strong></div>
+              <div><span data-i18n="sourcePages">Source pages</span><strong id="yamlSourcePages" data-i18n="sourcePagesPending">Pending AI detection</strong></div>
               <div><span data-i18n="generatedAt">Generated</span><strong id="yamlGeneratedAt">—</strong></div>
             </div>
             <div class="yaml-result-grid">

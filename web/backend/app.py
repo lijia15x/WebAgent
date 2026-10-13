@@ -4,15 +4,20 @@ import re
 from tempfile import TemporaryDirectory
 from pathlib import Path
 from typing import Literal
+from urllib.parse import quote
 from uuid import uuid4
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile, status
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from mrc_automation_agent.artifact_store import resolve_artifact
 from pdf_to_yaml_agent import YamlGenerationError, generate_architecture_yaml
+from pdf_to_yaml_agent.pdf_filter import (
+    ArchitectureFigureNotFoundError,
+    extract_architecture_pages,
+)
 from pdf_to_yaml_agent.reference_store import (
     InvalidReferenceFile,
     delete_reference,
@@ -186,6 +191,39 @@ async def remove_pdf_yaml_reference(file_name: str) -> dict:
     return {"files": list_references()}
 
 
+@app.post("/api/agents/pdf-yaml/prepare")
+async def prepare_pdf_yaml_source(pdf: UploadFile = File(...)) -> Response:
+    pdf_name = _safe_upload_name(pdf.filename, "architecture.pdf")
+    if not pdf_name.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Architecture source must be a PDF")
+
+    with TemporaryDirectory(prefix="pdf-yaml-prepare-") as directory:
+        request_directory = Path(directory)
+        source_path = request_directory / pdf_name
+        prepared_name = f"{Path(pdf_name).stem}_smbus_figures.pdf"
+        prepared_path = request_directory / prepared_name
+        await _save_upload(pdf, source_path, MAX_PDF_BYTES)
+        try:
+            selection = extract_architecture_pages(source_path, prepared_path)
+        except ArchitectureFigureNotFoundError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        content = prepared_path.read_bytes()
+
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{prepared_name}"',
+            "X-Prepared-Name": quote(prepared_name),
+            "X-Architecture-Product": quote(selection.product_name),
+            "X-Architecture-Target": quote(selection.target.caption),
+            "X-Architecture-Pages": ",".join(
+                str(figure.page_number) for figure in selection.figures
+            ),
+        },
+    )
+
+
 @app.post("/api/agents/pdf-yaml/generate")
 async def generate_pdf_yaml(pdf: UploadFile = File(...)) -> dict:
     pdf_name = _safe_upload_name(pdf.filename, "architecture.pdf")
@@ -223,6 +261,98 @@ async def generate_pdf_yaml(pdf: UploadFile = File(...)) -> dict:
         "source_file": pdf_name,
         "validation": validation,
     }
+
+
+@app.post("/api/agents/pdf-yaml/generate-stream")
+async def generate_pdf_yaml_stream(pdf: UploadFile = File(...)) -> StreamingResponse:
+    pdf_name = _safe_upload_name(pdf.filename, "architecture.pdf")
+    if not pdf_name.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Architecture source must be a PDF")
+
+    temporary_directory = TemporaryDirectory(prefix="pdf-yaml-stream-")
+    request_directory = Path(temporary_directory.name)
+    pdf_path = request_directory / pdf_name
+    try:
+        await _save_upload(pdf, pdf_path, MAX_PDF_BYTES)
+    except Exception:
+        temporary_directory.cleanup()
+        raise
+
+    reference_paths = list_reference_paths()
+    if not reference_paths:
+        if not DEFAULT_AUTHORING_GUIDE.is_file():
+            temporary_directory.cleanup()
+            raise HTTPException(
+                status_code=500,
+                detail="Default YAML authoring guide is unavailable",
+            )
+        reference_paths = [DEFAULT_AUTHORING_GUIDE]
+
+    output_stem = re.sub(r"[^A-Za-z0-9_-]+", "_", Path(pdf_name).stem).strip("_")
+
+    async def event_stream():
+        events: asyncio.Queue[dict | None] = asyncio.Queue()
+
+        async def report_progress(stage: str, percent: int) -> None:
+            await events.put(
+                {"type": "progress", "stage": stage, "percent": percent}
+            )
+
+        async def report_activity(activity: str) -> None:
+            await events.put({"type": "activity", "activity": activity})
+
+        async def report_process(message: str) -> None:
+            await events.put({"type": "process", "message": message})
+
+        async def run_generation() -> None:
+            try:
+                await report_progress("starting", 5)
+                content, validation = await generate_architecture_yaml(
+                    pdf_path,
+                    reference_paths,
+                    progress_callback=report_progress,
+                    activity_callback=report_activity,
+                    process_callback=report_process,
+                )
+                await events.put(
+                    {
+                        "type": "result",
+                        "yaml": content,
+                        "file_name": f"{output_stem or 'architecture'}.yml",
+                        "source_file": pdf_name,
+                        "validation": validation,
+                    }
+                )
+            except YamlGenerationError as exc:
+                await events.put({"type": "error", "detail": str(exc)})
+            except (RuntimeError, TimeoutError) as exc:
+                await events.put(
+                    {"type": "error", "detail": f"Copilot generation failed: {exc}"}
+                )
+            finally:
+                await events.put(None)
+
+        generation_task = asyncio.create_task(run_generation())
+        try:
+            while True:
+                event = await events.get()
+                if event is None:
+                    break
+                yield json.dumps(event, ensure_ascii=False) + "\n"
+        finally:
+            if not generation_task.done():
+                generation_task.cancel()
+                try:
+                    await generation_task
+                except asyncio.CancelledError:
+                    pass
+            temporary_directory.cleanup()
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="application/x-ndjson",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.post("/api/agents/{agent_id}/messages", status_code=status.HTTP_202_ACCEPTED)
