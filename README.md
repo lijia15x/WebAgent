@@ -27,6 +27,20 @@ ignored by Git.
 analysis. `MRC_PPT_MODEL` independently controls the model used for MRC PPT
 generation.
 
+The PDF-to-YAML agent uses Ollama directly. Configure `OLLAMA_BASE_URL`,
+`OLLAMA_MODEL` (default `qwen3:32b`), and `VISION_MODEL` (default
+`qwen3-vl:30b`). Both models must be installed on that Ollama server:
+
+```powershell
+ollama pull qwen3:32b
+ollama pull qwen3-vl:30b
+```
+
+Python extracts the target PDF pages, renders temporary overlapping crops,
+merges the model's structured inventory, writes YAML, and validates references
+and topology. Request workspaces and rendered images are deleted when the
+conversion finishes or fails.
+
 To enable **Send Mail**, configure `MRC_SMTP_SENDER_EMAIL`,
 `MRC_SMTP_SENDER_PASSWORD`, `MRC_SMTP_SERVER`, and `MRC_SMTP_PORT`. The MRC
 service connects with SMTP AUTH, upgrades the connection using STARTTLS, and

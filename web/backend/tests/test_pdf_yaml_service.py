@@ -19,6 +19,21 @@ from pdf_to_yaml_agent.converter import (
     validate_architecture_yaml,
 )
 from pdf_to_yaml_agent.pdf_filter import extract_architecture_pages
+from pdf_to_yaml_agent.ollama_pipeline import (
+    _reference_context,
+    build_fragment_structure_prompt,
+    build_topology_completion_prompt,
+    build_vision_prompt,
+    compile_architecture,
+    compile_inventory_connections,
+    collapse_nonphysical_elements,
+    invalid_fragment_connections,
+    isolated_physical_element_ids,
+    materialize_connector_endpoints,
+    merge_structures,
+    normalize_structure,
+    render_analysis_images,
+)
 from pdf_to_yaml_agent import reference_store
 from web.backend.app import app
 
@@ -147,6 +162,28 @@ class PdfYamlServiceTests(unittest.TestCase):
         self.assertFalse(invalid_type["valid"])
 
 class PdfYamlTopologyTests(unittest.TestCase):
+    def test_flags_cross_board_internal_net_for_review(self) -> None:
+        document = {
+            "version": 1,
+            "boards": [
+                {"id": "board_a", "label": "Board A"},
+                {"id": "board_b", "label": "Board B"},
+            ],
+            "elements": [
+                {"id": "source", "board": "board_a", "type": "controller", "ports": [{"id": "bus"}]},
+                {"id": "destination", "board": "board_b", "type": "sensor", "ports": [{"id": "bus"}]},
+            ],
+            "connections": [
+                {"from": "source", "from_port": "bus", "to": "destination", "to_port": "bus", "connection_type": "internal_net"}
+            ],
+        }
+
+        result = validate_architecture_yaml(yaml.safe_dump(document, sort_keys=False))
+
+        self.assertTrue(result["valid"])
+        self.assertTrue(result["review_required"])
+        self.assertTrue(any("Cross-board connection" in warning for warning in result["warnings"]))
+
     def test_flags_disconnected_hub_and_incomplete_connector_mating_for_review(self) -> None:
         document = {
             "version": 1,
@@ -251,7 +288,7 @@ class PdfYamlTopologyTests(unittest.TestCase):
 
 
 class PdfYamlGenerationTests(unittest.IsolatedAsyncioTestCase):
-    async def test_repairs_hard_error_with_patch_and_no_second_attachments(self) -> None:
+    async def test_repairs_hard_error_with_ollama_patch(self) -> None:
         progress_events: list[tuple[str, int]] = []
         activity_events: list[str] = []
         process_events: list[str] = []
@@ -274,59 +311,54 @@ class PdfYamlGenerationTests(unittest.IsolatedAsyncioTestCase):
             write_architecture_pdf(source)
             guide.write_text("guide", encoding="utf-8")
             invalid = VALID_YAML.replace("board: board_a", "board: missing_board")
-            patch_response = '[{"op":"replace","path":"/elements/0/board","value":"board_a"}]'
-            responses = [invalid, patch_response]
-            async def fake_ask(*args, **kwargs):
+            patch_response = [{"op": "replace", "path": "/elements/0/board", "value": "board_a"}]
+
+            async def fake_conversion(filtered_pdf, references, selection, workspace, **kwargs):
                 nonlocal first_page_count, copied_guide_content
-                workspace = Path(kwargs["workspace"])
+                workspace = Path(workspace)
                 workspace_paths.append(workspace)
                 self.assertTrue(workspace.is_dir())
-                self.assertIn("temporary request workspace", kwargs["workspace_guidance"])
-                files = kwargs.get("files") or []
-                if files:
-                    self.assertTrue(all(Path(path).is_file() for path in files))
-                    with pymupdf.open(files[0]) as document:
-                        first_page_count = document.page_count
-                    copied_guide_content = Path(files[1]).read_text(encoding="utf-8")
-                callback = kwargs.get("on_delta")
-                if callback is not None:
-                    callback("output started")
-                process_delta = kwargs.get("on_process_delta")
-                if process_delta is not None:
-                    process_delta("Tracing board connections against the selected architecture. ")
-                    await asyncio.sleep(0)
-                return responses.pop(0)
+                with pymupdf.open(filtered_pdf) as document:
+                    first_page_count = document.page_count
+                copied_guide_content = references[0].read_text(encoding="utf-8")
+                analysis = workspace / "analysis"
+                analysis.mkdir()
+                (analysis / "source_inventory.json").write_text("[]", encoding="utf-8")
+                await kwargs["activity_callback"]("writing_yaml")
+                await kwargs["process_callback"](
+                    "Tracing board connections against the selected architecture."
+                )
+                return invalid
 
-            with patch(
-                "pdf_to_yaml_agent.converter.ask_copilot",
-                new=AsyncMock(side_effect=fake_ask),
-            ) as ask:
+            with (
+                patch(
+                    "pdf_to_yaml_agent.converter.run_ollama_conversion",
+                    new=AsyncMock(side_effect=fake_conversion),
+                ) as conversion,
+                patch(
+                    "pdf_to_yaml_agent.converter.OllamaClient.chat_json",
+                    new=AsyncMock(return_value=patch_response),
+                ) as repair,
+            ):
                 content, validation = await generate_architecture_yaml(
                     source,
                     [guide],
-                    model="test-model",
                     progress_callback=record_progress,
                     activity_callback=record_activity,
                     process_callback=record_process,
                 )
 
-            first_files = ask.await_args_list[0].kwargs["files"]
-            second_files = ask.await_args_list[1].kwargs["files"]
-            repair_prompt = ask.await_args_list[1].args[0]
+            repair_prompt = repair.await_args.args[1]
 
         self.assertEqual(yaml.safe_load(VALID_YAML), yaml.safe_load(content))
         self.assertTrue(validation["valid"])
-        self.assertEqual(2, ask.await_count)
-        self.assertEqual("guide.md", first_files[1].name)
+        self.assertEqual(1, conversion.await_count)
+        self.assertEqual(1, repair.await_count)
         self.assertEqual("guide", copied_guide_content)
-        self.assertEqual([], second_files)
-        self.assertEqual(900.0, ask.await_args_list[0].kwargs["timeout"])
-        self.assertEqual(300.0, ask.await_args_list[1].kwargs["timeout"])
         self.assertIn("minimal RFC 6902-style JSON patch", repair_prompt)
         self.assertIn("Never remove boards, elements, ports, or connections", repair_prompt)
-        self.assertIn("_smbus_figures.pdf", first_files[0].name)
+        self.assertIn("_smbus_figures.pdf", conversion.await_args.args[0].name)
         self.assertEqual(2, first_page_count)
-        self.assertEqual(workspace_paths[0], workspace_paths[1])
         self.assertTrue(all(not path.exists() for path in workspace_paths))
         stages = [stage for stage, _ in progress_events]
         distinct_stages = [stage for index, stage in enumerate(stages) if index == 0 or stage != stages[index - 1]]
@@ -344,12 +376,12 @@ class PdfYamlGenerationTests(unittest.IsolatedAsyncioTestCase):
             process_events,
         )
 
-    async def test_deletes_workspace_when_copilot_fails(self) -> None:
+    async def test_deletes_workspace_when_ollama_fails(self) -> None:
         observed_workspace: Path | None = None
 
-        async def fail_ask(*args, **kwargs):
+        async def fail_conversion(filtered_pdf, references, selection, workspace, **kwargs):
             nonlocal observed_workspace
-            observed_workspace = Path(kwargs["workspace"])
+            observed_workspace = Path(workspace)
             self.assertTrue(observed_workspace.is_dir())
             (observed_workspace / "analysis").mkdir()
             (observed_workspace / "analysis" / "source_inventory.json").write_text(
@@ -364,8 +396,8 @@ class PdfYamlGenerationTests(unittest.IsolatedAsyncioTestCase):
             guide.write_text("guide", encoding="utf-8")
             with (
                 patch(
-                    "pdf_to_yaml_agent.converter.ask_copilot",
-                    new=AsyncMock(side_effect=fail_ask),
+                    "pdf_to_yaml_agent.converter.run_ollama_conversion",
+                    new=AsyncMock(side_effect=fail_conversion),
                 ),
                 self.assertRaisesRegex(RuntimeError, "generation failed"),
             ):
@@ -391,14 +423,359 @@ class PdfYamlGenerationTests(unittest.IsolatedAsyncioTestCase):
             write_architecture_pdf(source)
             guide.write_text("guide", encoding="utf-8")
             with patch(
-                "pdf_to_yaml_agent.converter.ask_copilot",
+                "pdf_to_yaml_agent.converter.run_ollama_conversion",
                 new=AsyncMock(return_value=topology_warning),
-            ) as ask:
+            ) as conversion:
                 _, validation = await generate_architecture_yaml(source, [guide])
 
-        self.assertEqual(1, ask.await_count)
+        self.assertEqual(1, conversion.await_count)
         self.assertTrue(validation["valid"])
         self.assertTrue(validation["review_required"])
+
+
+class PdfYamlOllamaPipelineTests(unittest.TestCase):
+    def test_renders_overview_and_overlapping_target_crops(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            source = workspace / "source.pdf"
+            filtered = workspace / "filtered.pdf"
+            analysis = workspace / "analysis"
+            write_architecture_pdf(source)
+            selection = extract_architecture_pages(source, filtered)
+
+            page_text, images = render_analysis_images(filtered, selection, analysis)
+
+            self.assertIn("Acme Modular SMBus Architecture", page_text)
+            self.assertEqual(10, len(images))
+            self.assertEqual("target_overview.png", images[0].name)
+            self.assertTrue(all(image.is_file() and image.stat().st_size > 0 for image in images))
+
+    def test_vision_prompts_treat_legend_symbols_as_annotations(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            source = workspace / "source.pdf"
+            filtered = workspace / "filtered.pdf"
+            write_architecture_pdf(source)
+            selection = extract_architecture_pages(source, filtered)
+
+            vision_prompt = build_vision_prompt(
+                selection, "crop.png", 1, 1
+            )
+            topology_prompt = build_topology_completion_prompt(
+                {"elements": [], "connections": []}, "crop 1"
+            )
+
+        expected_rule = "symbols defined by the figure legend as element annotations"
+        self.assertIn(expected_rule, vision_prompt)
+        self.assertIn(expected_rule, topology_prompt)
+
+    def test_yaml_reference_contributes_shape_without_hardware_values(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            reference = Path(directory) / "other_project.yml"
+            reference.write_text(
+                """version: 1
+boards:
+- id: forbidden_board
+  label: Forbidden Product
+elements:
+- id: forbidden_device
+  board: forbidden_board
+  type: sensor
+  part: SECRET123
+  ports:
+  - id: bus
+connections: []
+""",
+                encoding="utf-8",
+            )
+
+            context = _reference_context([reference])
+            prompt = build_fragment_structure_prompt(
+                {"boards": [], "elements": [], "connections": []},
+                "crop 1",
+                context,
+            )
+
+        self.assertIn('"boards": ["id", "label"]', context)
+        self.assertIn('"elements": ["board", "id", "part", "ports", "type"]', context)
+        self.assertIn('"element_types": ["sensor"]', context)
+        self.assertIn('"top_level_order": ["version", "boards", "elements", "connections"]', context)
+        self.assertIn("Normative representation guidance", prompt)
+        self.assertNotIn("Forbidden Product", context)
+        self.assertNotIn("SECRET123", context)
+        self.assertNotIn("forbidden_device", context)
+        self.assertNotIn("Forbidden Product", prompt)
+
+    def test_markdown_reference_keeps_rules_and_omits_fenced_examples(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            reference = Path(directory) / "authoring.md"
+            reference.write_text(
+                "Use port_display_order to preserve port order.\n\n"
+                "```yaml\nboards:\n  - id: example_board\n"
+                "    label: Other Product\n```\n",
+                encoding="utf-8",
+            )
+
+            context = _reference_context([reference])
+            prompt = build_fragment_structure_prompt(
+                {"boards": [], "elements": [], "connections": []},
+                "crop 1",
+                context,
+            )
+
+        self.assertIn("Use port_display_order to preserve port order.", prompt)
+        self.assertNotIn("example_board", prompt)
+        self.assertNotIn("Other Product", prompt)
+
+    def test_merge_and_connection_compiler_preserve_authoring_fields(self) -> None:
+        structure = merge_structures(
+            [
+                {
+                    "boards": [{"id": "board_a", "label": "Board A"}],
+                    "elements": [
+                        {
+                            "id": "controller",
+                            "board": "board_a",
+                            "label": "Controller",
+                            "type": "controller",
+                            "mechanical": "2x6 connector",
+                            "port_display_order": ["pI_C10"],
+                            "ports": [
+                                {
+                                    "id": "pI_C10",
+                                    "direction": "bidirectional",
+                                    "electrical_class": "active",
+                                    "i2c_role_capabilities": ["controller"],
+                                }
+                            ],
+                        },
+                        {
+                            "id": "target",
+                            "board": "board_a",
+                            "label": "Target",
+                            "type": "sensor",
+                            "ports": [{"id": "qI", "direction": "bidirectional"}],
+                        },
+                    ],
+                }
+            ]
+        )
+        inventory = [
+            {
+                "connections": [
+                    {
+                        "from_element": "Controller",
+                        "from_port": "pI_C10",
+                        "to_element": "Target",
+                        "to_port": "qI",
+                        "connection_type": "cable",
+                        "protocol": "i2c",
+                        "speed_hz": 100000,
+                        "medium": "picpwr_cable",
+                        "length_mm": 500,
+                        "from_role": "controller",
+                        "to_role": "passive",
+                    }
+                ]
+            }
+        ]
+
+        controller = structure["elements"][0]
+        connections, unresolved = compile_inventory_connections(
+            structure, inventory, [structure]
+        )
+
+        self.assertEqual("2x6 connector", controller["mechanical"])
+        self.assertEqual(["pI_C10"], controller["port_display_order"])
+        self.assertEqual("pI_C10", controller["ports"][0]["id"])
+        self.assertEqual("active", controller["ports"][0]["electrical_class"])
+        self.assertEqual("qI", structure["elements"][1]["ports"][0]["id"])
+        self.assertEqual([], unresolved)
+        self.assertEqual("pI_C10", connections[0]["from_port"])
+        self.assertEqual("qI", connections[0]["to_port"])
+        self.assertEqual(100000, connections[0]["speed_hz"])
+        self.assertEqual(500, connections[0]["length_mm"])
+        self.assertEqual("controller", connections[0]["from_role"])
+
+    def test_compiles_separate_structure_and_connections(self) -> None:
+        structure = normalize_structure(
+            {
+                "boards": [{"id": "board_a", "label": "Board A"}],
+                "elements": [
+                    {
+                        "id": "controller",
+                        "board": "board_a",
+                        "type": "controller",
+                        "ports": [{"id": "bus"}],
+                    }
+                ],
+            }
+        )
+
+        architecture = compile_architecture(structure, {"connections": []})
+
+        self.assertEqual(
+            ["version", "boards", "elements", "connections"],
+            list(architecture),
+        )
+        self.assertEqual("controller", architecture["elements"][0]["id"])
+
+    def test_merges_crop_structures_without_collapsing_distinct_addresses(self) -> None:
+        structures = [
+            {
+                "boards": [{"id": "board_a", "label": "Board A"}],
+                "elements": [
+                    {"id": "sensor", "board": "board_a", "label": "Sensor", "type": "sensor", "part": "TMP75", "address": "0x48", "ports": ["bus"]},
+                ],
+            },
+            {
+                "boards": [{"id": "board_a", "label": "Board A"}],
+                "elements": [
+                    {"id": "sensor", "board": "board_a", "label": "Sensor", "type": "sensor", "part": "TMP75", "address": "0x48", "ports": [{"id": "alert"}]},
+                    {"id": "sensor", "board": "board_a", "label": "Sensor", "type": "sensor", "part": "TMP75", "address": "0x49", "ports": [{"id": "bus"}]},
+                ],
+            },
+        ]
+
+        merged = merge_structures(structures)
+
+        self.assertEqual(1, len(merged["boards"]))
+        self.assertEqual(2, len(merged["elements"]))
+        self.assertEqual(["sensor", "sensor_2"], [item["id"] for item in merged["elements"]])
+        self.assertEqual(
+            {"bus", "alert"},
+            {port["id"] for port in merged["elements"][0]["ports"]},
+        )
+
+    def test_compiles_resolvable_inventory_connections_and_adds_ports(self) -> None:
+        structure = {
+            "boards": [{"id": "board_a", "label": "Board A"}],
+            "elements": [
+                {"id": "controller", "board": "board_a", "label": "Main Controller", "type": "controller", "ports": [{"id": "bus"}]},
+                {"id": "mux", "board": "board_a", "label": "PCA9546 Mux 0x70", "type": "mux", "part": "PCA9546", "ports": [{"id": "upstream"}]},
+            ],
+        }
+        inventory = [
+            {
+                "connections": [
+                    {"from_element": "Main Controller", "from_port": "SMB 1", "to_element": "PCA9546 Mux 0x70", "to_port": "C0", "connection_type": "direct", "protocol": "SMBus"},
+                    {"from_element": "Unknown", "from_port": "bus", "to_element": "Main Controller", "to_port": "bus", "connection_type": "direct"},
+                ]
+            }
+        ]
+
+        connections, unresolved = compile_inventory_connections(structure, inventory)
+
+        self.assertEqual(1, len(connections))
+        self.assertEqual("internal_net", connections[0]["connection_type"])
+        self.assertEqual("smbus", connections[0]["protocol"])
+        self.assertEqual("SMB 1", connections[0]["from_port"])
+        self.assertIn({"id": "C0"}, structure["elements"][1]["ports"])
+        self.assertEqual(1, len(unresolved))
+
+    def test_compiles_only_endpoints_preserved_as_local_physical_elements(self) -> None:
+        structure = {
+            "boards": [{"id": "board_a", "label": "Board A"}],
+            "elements": [
+                {"id": "controller", "board": "board_a", "label": "Controller", "type": "controller", "ports": [{"id": "bus"}]},
+                {"id": "mux", "board": "board_a", "label": "Mux", "type": "mux", "ports": [{"id": "bus"}]},
+            ],
+        }
+        inventory = [{"connections": [
+            {"from_element": "Controller", "to_element": "Mux", "connection_type": "direct"},
+            {"from_element": "SMB_HOST", "to_element": "Board A", "connection_type": "bus"},
+        ]}]
+        cleaned = [{"boards": [{"id": "board_a", "label": "Board A"}], "elements": [
+            {"id": "controller", "board": "board_a", "label": "Controller", "type": "controller", "ports": [{"id": "bus"}]},
+            {"id": "mux", "board": "board_a", "label": "Mux", "type": "mux", "ports": [{"id": "bus"}]},
+        ]}]
+
+        connections, unresolved = compile_inventory_connections(
+            structure, inventory, cleaned
+        )
+
+        self.assertEqual(1, len(connections))
+        self.assertEqual(1, len(unresolved))
+
+    def test_finds_connections_with_undeclared_local_endpoints(self) -> None:
+        fragment = {
+            "elements": [{"id": "controller"}, {"id": "mux"}],
+            "connections": [
+                {"from_element": "controller", "to_element": "mux"},
+                {"from_element": "controller", "to_element": "missing_connector"},
+            ],
+        }
+
+        invalid = invalid_fragment_connections(fragment)
+
+        self.assertEqual([fragment["connections"][1]], invalid)
+
+    def test_materializes_named_connector_endpoints_but_not_bus_labels(self) -> None:
+        fragment = {
+            "boards": [{"id": "board_a", "label": "Board A"}],
+            "elements": [{"id": "hub", "board": "board_a", "label": "Hub"}],
+            "connections": [
+                {"from_element": "hub", "to_element": "cpu_0_port_1_conn_1", "to_port": "mating"},
+                {"from_element": "hub", "to_element": "smb_host"},
+            ],
+        }
+
+        materialize_connector_endpoints(fragment)
+
+        connector = next(
+            item for item in fragment["elements"] if item["id"] == "cpu_0_port_1_conn_1"
+        )
+        self.assertEqual("connector", connector["type"])
+        self.assertEqual("board_a", connector["board"])
+        self.assertNotIn("smb_host", {item["id"] for item in fragment["elements"]})
+
+    def test_collapses_bus_elements_into_physical_connections(self) -> None:
+        architecture = {
+            "version": 1,
+            "boards": [{"id": "board", "label": "Board"}],
+            "elements": [
+                {"id": "controller", "type": "controller"},
+                {"id": "smb_host", "type": "bus", "label": "SMB_HOST"},
+                {"id": "i2c_channel", "type": "i2c_channel", "label": "I2C Channel"},
+                {"id": "physical_interface", "type": "bus_interface", "part": "PCA9617"},
+                {"id": "mux", "type": "mux"},
+                {"id": "sensor", "type": "sensor"},
+            ],
+            "connections": [
+                {"from": "controller", "from_port": "bus", "to": "smb_host", "to_port": "bus", "connection_type": "internal_net", "protocol": "smbus"},
+                {"from": "smb_host", "from_port": "bus", "to": "mux", "to_port": "upstream", "connection_type": "internal_net", "protocol": "smbus"},
+                {"from": "smb_host", "from_port": "bus", "to": "sensor", "to_port": "bus", "connection_type": "internal_net", "protocol": "smbus"},
+            ],
+        }
+
+        collapsed = collapse_nonphysical_elements(architecture)
+
+        self.assertNotIn("smb_host", {item["id"] for item in collapsed["elements"]})
+        self.assertNotIn("i2c_channel", {item["id"] for item in collapsed["elements"]})
+        self.assertIn("physical_interface", {item["id"] for item in collapsed["elements"]})
+        self.assertEqual(2, len(collapsed["connections"]))
+        self.assertEqual(
+            {"controller", "mux", "sensor"},
+            {
+                endpoint
+                for connection in collapsed["connections"]
+                for endpoint in (connection["from"], connection["to"])
+            },
+        )
+
+    def test_finds_only_isolated_physical_elements(self) -> None:
+        fragment = {
+            "elements": [
+                {"id": "controller", "type": "controller"},
+                {"id": "mux", "type": "mux"},
+                {"id": "smb_host", "type": "bus"},
+            ],
+            "connections": [
+                {"from_element": "controller", "to_element": "smb_host"}
+            ],
+        }
+
+        self.assertEqual(["mux"], isolated_physical_element_ids(fragment))
 
 
 class PdfYamlPatchTests(unittest.TestCase):

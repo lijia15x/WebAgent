@@ -228,17 +228,17 @@
                 <div class="generation-progress-track"><span id="generationProgressBar"></span></div>
                 <div class="generation-timer"><span data-i18n="elapsedTime">Elapsed time</span><strong id="generationTimer">00:00</strong></div>
                 <div class="copilot-activity">
-                  <div class="copilot-activity-heading"><span class="copilot-activity-dot" id="copilotActivityDot" aria-hidden="true"></span><strong data-i18n="copilotActivity">Copilot activity</strong></div>
+                  <div class="copilot-activity-heading"><span class="copilot-activity-dot" id="copilotActivityDot" aria-hidden="true"></span><strong data-i18n="copilotActivity">Model activity</strong></div>
                   <ol id="copilotActivityList" aria-live="polite"><li data-i18n="copilotWaiting">Waiting to start</li></ol>
                 </div>
               </div>
-              <small class="engine-note" data-i18n="enginePending">The PDF and reference files are sent to Copilot for this conversion only.</small>
+              <small class="engine-note" data-i18n="enginePending">Python processes the PDF locally; temporary crops are sent to Ollama for this conversion only.</small>
             </aside>
           </div>
 
           <section class="yaml-result is-hidden" id="yamlResult" aria-live="polite">
             <header class="yaml-result-header">
-              <div><span class="eyebrow" data-i18n="generatedArtifact">Generated artifact</span><div class="result-title-line"><h2 id="yamlFileName">architecture.yml</h2><span class="sample-badge generated-badge" data-i18n="generatedOutput">Copilot output</span></div></div>
+              <div><span class="eyebrow" data-i18n="generatedArtifact">Generated artifact</span><div class="result-title-line"><h2 id="yamlFileName">architecture.yml</h2><span class="sample-badge generated-badge" data-i18n="generatedOutput">Ollama output</span></div></div>
               <div class="result-actions">
                 <button class="quiet-button" type="button" id="copyYaml"><span aria-hidden="true">▣</span><span data-i18n="copyYaml">Copy</span></button>
                 <button class="quiet-button" type="button" id="downloadYaml"><span aria-hidden="true">↓</span><span data-i18n="downloadYaml">Download .yml</span></button>

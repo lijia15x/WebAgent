@@ -1,11 +1,7 @@
-import asyncio
 import copy
 import json
-import os
 import re
 import shutil
-import sys
-import time
 from collections import Counter, defaultdict
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -13,7 +9,14 @@ from typing import Any, Awaitable, Callable, Sequence
 
 import yaml
 
-from common.skills.copilot_sdk.copilot_sdk_client import ask_copilot
+from pdf_to_yaml_agent.ollama_client import OllamaClient
+from pdf_to_yaml_agent.ollama_pipeline import run_ollama_conversion, write_audit
+from pdf_to_yaml_agent.config import (
+    OLLAMA_CONTEXT_WINDOW,
+    REPAIR_MAX_OUTPUT_TOKENS,
+    REPAIR_TIMEOUT_SECONDS,
+    text_model,
+)
 from pdf_to_yaml_agent.pdf_filter import (
     ArchitectureFigureNotFoundError,
     ArchitectureSelection,
@@ -27,8 +30,6 @@ ProgressCallback = Callable[[str, int], Awaitable[None]]
 ActivityCallback = Callable[[str], Awaitable[None]]
 ProcessCallback = Callable[[str], Awaitable[None]]
 PDF_WORKSPACE_GUIDANCE = """Use the temporary request workspace actively. You may create analysis files and run read-only inspection commands inside it. Do not modify the source PDF or files under references. Do not access files outside this workspace. All analysis artifacts are temporary and must not be mentioned in the final response."""
-DEFAULT_GENERATION_TIMEOUT_SECONDS = 900.0
-DEFAULT_REPAIR_TIMEOUT_SECONDS = 300.0
 
 
 class YamlGenerationError(RuntimeError):
@@ -43,19 +44,6 @@ def select_reference_files(reference_files: Sequence[Path]) -> list[Path]:
         if current is None or (path.suffix.lower() == ".md" and current.suffix.lower() == ".pdf"):
             selected[key] = path
     return sorted(selected.values(), key=lambda path: path.name.casefold())
-
-
-def timeout_from_env(name: str, default: float) -> float:
-    raw_value = os.getenv(name)
-    if raw_value is None:
-        return default
-    try:
-        timeout = float(raw_value)
-    except ValueError as exc:
-        raise YamlGenerationError(f"{name} must be a number of seconds") from exc
-    if timeout <= 0:
-        raise YamlGenerationError(f"{name} must be greater than zero")
-    return timeout
 
 
 def build_generation_prompt(
@@ -206,6 +194,7 @@ def validate_architecture_yaml(content: str) -> dict[str, Any]:
     element_ids: set[str] = set()
     element_ports: dict[str, set[str]] = {}
     element_types: dict[str, str] = {}
+    element_boards: dict[str, str] = {}
     for element in elements:
         if not isinstance(element, dict):
             fail("schema", "Each element must be a mapping")
@@ -219,6 +208,8 @@ def validate_architecture_yaml(content: str) -> dict[str, Any]:
         element_ids.add(element_id)
         if element.get("board") not in board_ids:
             fail("references", f"Element {element_id} references unknown board {element.get('board')}")
+        else:
+            element_boards[element_id] = element["board"]
         if not isinstance(element.get("type"), str) or not element["type"].strip():
             fail("schema", f"Element {element_id} requires a type")
         else:
@@ -280,6 +271,15 @@ def validate_architecture_yaml(content: str) -> dict[str, Any]:
         for connection in valid_connections:
             source = connection["from"]
             destination = connection["to"]
+            if (
+                connection["connection_type"] == "internal_net"
+                and element_boards.get(source) != element_boards.get(destination)
+            ):
+                warn(
+                    "topology",
+                    f"Cross-board connection {source} -> {destination} uses internal_net; "
+                    "a visible board boundary should use mating or cable",
+                )
             adjacency[source].add(destination)
             adjacency[destination].add(source)
             port_connection_types[(source, connection["from_port"])].add(
@@ -470,7 +470,7 @@ def apply_repair_patch(document: dict[str, Any], content: str) -> dict[str, Any]
     try:
         operations = json.loads(cleaned)
     except json.JSONDecodeError as exc:
-        raise YamlGenerationError(f"Copilot returned an invalid repair patch: {exc}") from exc
+        raise YamlGenerationError(f"Ollama returned an invalid repair patch: {exc}") from exc
     if not isinstance(operations, list) or not 1 <= len(operations) <= 64:
         raise YamlGenerationError("Repair patch must contain between 1 and 64 operations")
 
@@ -541,7 +541,6 @@ def ensure_scope_preserved(before: dict[str, Any], after: dict[str, Any]) -> Non
 async def generate_architecture_yaml(
     source_pdf: Path,
     reference_files: Sequence[Path],
-    model: str | None = None,
     progress_callback: ProgressCallback | None = None,
     activity_callback: ActivityCallback | None = None,
     process_callback: ProcessCallback | None = None,
@@ -566,7 +565,6 @@ async def generate_architecture_yaml(
             workspace_source,
             workspace_references,
             workspace,
-            model=model,
             progress_callback=progress_callback,
             activity_callback=activity_callback,
             process_callback=process_callback,
@@ -577,7 +575,6 @@ async def _generate_architecture_yaml_in_workspace(
     source_pdf: Path,
     reference_files: Sequence[Path],
     workspace: Path,
-    model: str | None = None,
     progress_callback: ProgressCallback | None = None,
     activity_callback: ActivityCallback | None = None,
     process_callback: ProcessCallback | None = None,
@@ -601,78 +598,27 @@ async def _generate_architecture_yaml_in_workspace(
     except ArchitectureFigureNotFoundError as exc:
         raise YamlGenerationError(str(exc)) from exc
     selected_references = select_reference_files(reference_files)
-    attachments = [filtered_pdf, *selected_references]
-    prompt = build_generation_prompt(
-        filtered_pdf.name,
-        [path.name for path in selected_references],
-        selection,
-        python_executable=sys.executable,
-    )
     await report("generating", 25)
     await report_activity("context_ready")
-    generation_percent = 25
-    last_activity_at = 0.0
-    process_buffer = ""
-    last_process_message = ""
-
-    def clean_process_message(message: str) -> str:
-        cleaned = re.sub(r"[`#*_>]", "", message)
-        cleaned = re.sub(r"\s+", " ", cleaned).strip(" -:\n\t")
-        return cleaned[:177] + "..." if len(cleaned) > 180 else cleaned
-
-    def report_generation_activity(activity: str) -> None:
-        nonlocal generation_percent, last_activity_at
-        now = time.monotonic()
-        if now - last_activity_at < 5 or generation_percent >= 55:
-            return
-        last_activity_at = now
-        generation_percent += 1
-        asyncio.get_running_loop().create_task(report("generating", generation_percent))
-        asyncio.get_running_loop().create_task(report_activity(activity))
-
-    def report_process_activity(delta: str) -> None:
-        nonlocal process_buffer, last_process_message
-        report_generation_activity("analyzing")
-        process_buffer += delta
-        while True:
-            boundary = re.search(r"(?:[.!?。！？](?:\s|$)|\n)", process_buffer)
-            if boundary is None and len(process_buffer) < 180:
-                break
-            end = boundary.end() if boundary is not None else 180
-            message = clean_process_message(process_buffer[:end])
-            process_buffer = process_buffer[end:]
-            if len(message) < 12 or message == last_process_message:
-                continue
-            last_process_message = message
-            asyncio.get_running_loop().create_task(report_process(message))
-
-    def report_output_activity(_: str) -> None:
-        report_generation_activity("writing_yaml")
-
-    def report_tool_activity(_: str) -> None:
-        report_generation_activity("inspecting_inputs")
-
-    content = await ask_copilot(
-        prompt,
-        model=model or os.getenv("PDF_YAML_MODEL", "gpt-5.4-mini"),
-        files=attachments,
-        workspace=workspace,
-        workspace_guidance=PDF_WORKSPACE_GUIDANCE,
-        timeout=timeout_from_env(
-            "PDF_YAML_GENERATION_TIMEOUT_SECONDS",
-            DEFAULT_GENERATION_TIMEOUT_SECONDS,
-        ),
-        on_delta=report_output_activity,
-        on_process_delta=report_process_activity,
-        on_activity=report_tool_activity,
+    content = await run_ollama_conversion(
+        filtered_pdf,
+        selected_references,
+        selection,
+        workspace,
+        progress_callback=progress_callback,
+        activity_callback=activity_callback,
+        process_callback=process_callback,
     )
-    remaining_process = clean_process_message(process_buffer)
-    if len(remaining_process) >= 12 and remaining_process != last_process_message:
-        await report_process(remaining_process)
     await report_activity("response_received")
     await report("validating", 65)
     candidate = strip_yaml_fence(content)
     validation = validate_architecture_yaml(candidate)
+    inventory_path = workspace / "analysis" / "source_inventory.json"
+    if inventory_path.is_file():
+        inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+        document = yaml.safe_load(candidate)
+        if isinstance(inventory, list) and isinstance(document, dict):
+            write_audit(workspace / "analysis", inventory, document, validation)
     if validation["valid"]:
         await report("completed", 100)
         return candidate, validation
@@ -681,26 +627,26 @@ async def _generate_architecture_yaml_in_workspace(
         original_document = yaml.safe_load(candidate)
     except yaml.YAMLError as exc:
         raise YamlGenerationError(
-            "Copilot returned invalid YAML syntax that cannot be safely patched; regenerate the YAML"
+            "Ollama returned invalid YAML syntax that cannot be safely patched; regenerate the YAML"
         ) from exc
     if not isinstance(original_document, dict):
         raise YamlGenerationError(
-            "Copilot returned a non-mapping YAML document that cannot be safely patched"
+            "Ollama returned a non-mapping YAML document that cannot be safely patched"
         )
 
     await report("repairing", 72)
     await report_activity("repairing_yaml")
-    patch_content = await ask_copilot(
-        build_repair_prompt(candidate, validation["errors"]),
-        model=model or os.getenv("PDF_YAML_MODEL", "gpt-5.4-mini"),
-        files=[],
-        workspace=workspace,
-        workspace_guidance=PDF_WORKSPACE_GUIDANCE,
-        timeout=timeout_from_env(
-            "PDF_YAML_REPAIR_TIMEOUT_SECONDS",
-            DEFAULT_REPAIR_TIMEOUT_SECONDS,
-        ),
+    repair_client = OllamaClient(
+        timeout=REPAIR_TIMEOUT_SECONDS,
+        context_window=OLLAMA_CONTEXT_WINDOW,
     )
+    patch_result = await repair_client.chat_json(
+        text_model(),
+        build_repair_prompt(candidate, validation["errors"]),
+        thinking_callback=process_callback,
+        max_output_tokens=REPAIR_MAX_OUTPUT_TOKENS,
+    )
+    patch_content = json.dumps(patch_result)
     await report("revalidating", 95)
     repaired_document = apply_repair_patch(original_document, patch_content)
     ensure_scope_preserved(original_document, repaired_document)
@@ -708,7 +654,7 @@ async def _generate_architecture_yaml_in_workspace(
     validation = validate_architecture_yaml(candidate)
     if not validation["valid"]:
         raise YamlGenerationError(
-            "Copilot returned non-compliant YAML after one repair attempt: "
+            "Ollama returned non-compliant YAML after one repair attempt: "
             + "; ".join(validation["errors"][:5])
         )
     await report("completed", 100)

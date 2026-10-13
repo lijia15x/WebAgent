@@ -251,7 +251,7 @@ async def generate_pdf_yaml(pdf: UploadFile = File(...)) -> dict:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
         except (RuntimeError, TimeoutError) as exc:
             raise HTTPException(
-                status_code=502, detail=f"Copilot generation failed: {exc}"
+                status_code=502, detail=f"Ollama generation failed: {exc}"
             ) from exc
 
     output_stem = re.sub(r"[^A-Za-z0-9_-]+", "_", Path(pdf_name).stem).strip("_")
@@ -327,7 +327,7 @@ async def generate_pdf_yaml_stream(pdf: UploadFile = File(...)) -> StreamingResp
                 await events.put({"type": "error", "detail": str(exc)})
             except (RuntimeError, TimeoutError) as exc:
                 await events.put(
-                    {"type": "error", "detail": f"Copilot generation failed: {exc}"}
+                    {"type": "error", "detail": f"Ollama generation failed: {exc}"}
                 )
             finally:
                 await events.put(None)
