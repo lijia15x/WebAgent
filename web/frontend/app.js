@@ -2,6 +2,7 @@ const agents = {
   jenkins: { initials: "JL", title: "Jenkins Log Analyst", avatar: "avatar-jenkins", ready: true, descriptionKey: "agentDescription" },
   mrc: { initials: "MA", title: "MRC Automation", avatar: "avatar-mrc", ready: true, descriptionKey: "mrcDescription" },
   "pdf-yaml": { initials: "PY", title: "PDF-to-YAML Architecture", avatar: "avatar-pdf", ready: true, descriptionKey: "pdfYamlDescription" },
+  i2c: { initials: "IA", title: "I2C Automation", avatar: "avatar-i2c", ready: true, descriptionKey: "i2cDescription" },
 };
 
 const translations = {
@@ -21,6 +22,7 @@ const translations = {
     agentDescription: "定位构建失败原因，并结合 Workspace 源码给出修复建议",
     mrcDescription: "扫描每周 MRC Excel，筛选负责人、发送提醒邮件或生成汇报 PPT",
     pdfYamlDescription: "从 PDF 架构图提取可追溯的结构化 YAML",
+    i2cDescription: "解析示波器 CSV 波形，生成 I2C/SMBus 协议交易和导出报告",
     workspaceReady: "工作区就绪",
     newSession: "新会话",
     showActivity: "显示执行轨迹",
@@ -224,6 +226,33 @@ const translations = {
     yamlGenerated: "YAML 已生成并通过校验",
     yamlReviewRequired: "YAML 结构有效，但存在需要复核的拓扑警告",
     yamlGenerationFailed: "YAML 生成失败",
+    i2cPipeline: "波形解码器",
+    i2cWorkspaceTitle: "解码 I2C 和 SMBus CSV 波形",
+    i2cWorkspaceDescription: "上传包含 time、SCL 和 SDA 列的示波器 CSV。解码器会导出协议明细、文本报告和表格摘要。",
+    i2cCaptureCsv: "采样 CSV",
+    chooseI2cCsv: "选择示波器 CSV",
+    i2cUploadHint: "仅支持 CSV · 每次解码一个采样文件",
+    timeColumn: "时间列",
+    sclColumn: "SCL 列",
+    sdaColumn: "SDA 列",
+    sclThreshold: "SCL 阈值",
+    sdaThreshold: "SDA 阈值",
+    hysteresis: "迟滞比例",
+    decodeI2c: "解码采样",
+    decodeResult: "解码结果",
+    waitingForCapture: "等待采样文件",
+    transactions: "交易数",
+    completeTransactions: "完整交易",
+    addresses: "地址",
+    sclFrequency: "SCL 频率",
+    noI2cArtifacts: "运行解码后生成产物",
+    noDecodedTransactions: "暂无解码交易",
+    i2cCsvSelected: "已选择 CSV 文件",
+    i2cInvalidCsv: "请选择 CSV 文件",
+    i2cDecoding: "正在解码 I2C 采样…",
+    i2cDecodeStarted: "I2C 解码已启动",
+    i2cDecodeCompleted: "I2C 解码完成",
+    i2cDecodeFailed: "I2C 解码失败",
   },
   en: {
     pageTitle: "Agent Desk",
@@ -241,6 +270,7 @@ const translations = {
     agentDescription: "Find build failures and verify root causes against workspace source code",
     mrcDescription: "Scan weekly MRC workbooks, filter owners, send reminders, or generate report PPTs",
     pdfYamlDescription: "Extract traceable, structured YAML from PDF architecture diagrams",
+    i2cDescription: "Decode oscilloscope CSV waveforms into I2C/SMBus transactions and export reports",
     workspaceReady: "Workspace ready",
     newSession: "New session",
     showActivity: "Show execution activity",
@@ -444,6 +474,33 @@ const translations = {
     yamlGenerated: "YAML generated and validated",
     yamlReviewRequired: "YAML structure is valid, but topology warnings require review",
     yamlGenerationFailed: "YAML generation failed",
+    i2cPipeline: "Waveform decoder",
+    i2cWorkspaceTitle: "Decode I2C and SMBus CSV captures",
+    i2cWorkspaceDescription: "Upload oscilloscope CSV captures with time, SCL and SDA columns. The decoder exports protocol detail, text report and a spreadsheet summary.",
+    i2cCaptureCsv: "Capture CSV",
+    chooseI2cCsv: "Choose an oscilloscope CSV",
+    i2cUploadHint: "CSV only · one capture per decode",
+    timeColumn: "Time column",
+    sclColumn: "SCL column",
+    sdaColumn: "SDA column",
+    sclThreshold: "SCL threshold",
+    sdaThreshold: "SDA threshold",
+    hysteresis: "Hysteresis",
+    decodeI2c: "Decode capture",
+    decodeResult: "Decode result",
+    waitingForCapture: "Waiting for capture",
+    transactions: "Transactions",
+    completeTransactions: "Complete",
+    addresses: "Addresses",
+    sclFrequency: "SCL frequency",
+    noI2cArtifacts: "Run a decode to create artifacts",
+    noDecodedTransactions: "No decoded transactions yet",
+    i2cCsvSelected: "CSV selected",
+    i2cInvalidCsv: "Choose a CSV file",
+    i2cDecoding: "Decoding I2C capture…",
+    i2cDecodeStarted: "I2C decode started",
+    i2cDecodeCompleted: "I2C decode completed",
+    i2cDecodeFailed: "I2C decode failed",
   },
 };
 
@@ -458,6 +515,7 @@ const activityStatus = document.querySelector("#activityStatus");
 const languageToggle = document.querySelector("#languageToggle");
 const mrcWorkspace = document.querySelector("#mrcWorkspace");
 const pdfWorkspace = document.querySelector("#pdfWorkspace");
+const i2cWorkspace = document.querySelector("#i2cWorkspace");
 const contentGrid = document.querySelector(".content-grid");
 const composerWrap = document.querySelector("#composerWrap");
 let selectedAgent = "jenkins";
@@ -465,7 +523,9 @@ let currentLanguage = "en";
 let toastTimer;
 let eventSource;
 let mrcEventSource;
+let i2cEventSource;
 let isRunning = false;
+let i2cDecodeRunning = false;
 let automationEnabled = false;
 let mrcScanRunning = false;
 let currentMrcDrafts = [];
@@ -825,17 +885,19 @@ function setAgent(id) {
   document.querySelector("#agentStatus").textContent = t("ready");
   const isMrc = id === "mrc";
   const isPdfYaml = id === "pdf-yaml";
-  const isToolWorkspace = isMrc || isPdfYaml;
+  const isI2c = id === "i2c";
+  const isToolWorkspace = isMrc || isPdfYaml || isI2c;
   document.querySelector(".chat-workspace").classList.toggle("mrc-mode", isToolWorkspace);
   contentGrid.classList.toggle("is-hidden", isToolWorkspace);
   composerWrap.classList.toggle("is-hidden", isToolWorkspace);
   mrcWorkspace.classList.toggle("is-hidden", !isMrc);
   pdfWorkspace.classList.toggle("is-hidden", !isPdfYaml);
+  i2cWorkspace.classList.toggle("is-hidden", !isI2c);
   document.querySelector("#clearButton").classList.toggle("is-hidden", isToolWorkspace);
   document.querySelector("#activityToggle").classList.toggle("is-hidden", isToolWorkspace);
   document.querySelector("#runStrip").classList.add("is-hidden");
-  sendButton.disabled = !agent.ready || isRunning || isMrc;
-  input.disabled = !agent.ready || isRunning || isMrc;
+  sendButton.disabled = !agent.ready || isRunning || isToolWorkspace;
+  input.disabled = !agent.ready || isRunning || isToolWorkspace;
   input.placeholder = t("messagePlaceholder");
   sidebar.classList.remove("is-open");
   if (isMrc) {
@@ -868,7 +930,17 @@ const copilotActivityList = document.querySelector("#copilotActivityList");
 const generationSteps = Array.from(document.querySelectorAll("[data-generation-step]"));
 const yamlResult = document.querySelector("#yamlResult");
 const yamlPreview = document.querySelector("#yamlPreview");
+const i2cForm = document.querySelector("#i2cForm");
+const i2cCaptureInput = document.querySelector("#i2cCaptureInput");
+const selectedI2cCapture = document.querySelector("#selectedI2cCapture");
+const selectedI2cName = document.querySelector("#selectedI2cName");
+const selectedI2cMeta = document.querySelector("#selectedI2cMeta");
+const i2cDecodeButton = document.querySelector("#i2cDecodeButton");
+const i2cResultTitle = document.querySelector("#i2cResultTitle");
+const i2cArtifacts = document.querySelector("#i2cArtifacts");
+const i2cSummaryBody = document.querySelector("#i2cSummaryBody");
 let architecturePdf;
+let i2cCapture;
 let preparedPdfName = "";
 let preparedPdfPages = "";
 let preparedPdfUrl = "";
@@ -1684,4 +1756,141 @@ async function submitMessage() {
 document.querySelector("#messageForm").addEventListener("submit", event => { event.preventDefault(); submitMessage(); });
 input.addEventListener("keydown", event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); submitMessage(); } });
 input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = `${Math.min(input.scrollHeight, 130)}px`; });
+
+function updateI2cControls() {
+  i2cDecodeButton.disabled = !i2cCapture || i2cDecodeRunning;
+  i2cDecodeButton.classList.toggle("is-loading", i2cDecodeRunning);
+  i2cDecodeButton.querySelector("span").textContent = i2cDecodeRunning ? t("i2cDecoding") : t("decodeI2c");
+}
+
+function formatFrequency(value) {
+  if (!value) return "—";
+  if (value >= 1000) return `${(value / 1000).toFixed(1)} kHz`;
+  return `${value.toFixed(1)} Hz`;
+}
+
+function renderI2cArtifacts(artifacts) {
+  i2cArtifacts.replaceChildren();
+  if (!artifacts?.length) {
+    const empty = document.createElement("span");
+    empty.className = "artifact-empty";
+    empty.textContent = t("noI2cArtifacts");
+    i2cArtifacts.append(empty);
+    return;
+  }
+  artifacts.forEach(artifact => {
+    const link = document.createElement("a");
+    link.className = "artifact-link";
+    link.href = artifact.download_url;
+    link.download = artifact.file_name;
+    link.textContent = artifact.file_name;
+    i2cArtifacts.append(link);
+  });
+}
+
+function renderI2cRows(rows) {
+  i2cSummaryBody.replaceChildren();
+  if (!rows?.length) {
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+    cell.colSpan = 5;
+    cell.textContent = t("noDecodedTransactions");
+    row.append(cell);
+    i2cSummaryBody.append(row);
+    return;
+  }
+  rows.forEach(item => {
+    const row = document.createElement("tr");
+    ["Txn", "Address", "Register", "Data", "Status"].forEach(key => {
+      const cell = document.createElement("td");
+      cell.textContent = item[key] || "";
+      row.append(cell);
+    });
+    i2cSummaryBody.append(row);
+  });
+}
+
+function renderI2cResult(payload) {
+  const summary = payload.summary || {};
+  i2cResultTitle.textContent = summary.source_file || t("i2cDecodeCompleted");
+  document.querySelector("#i2cTxnCount").textContent = summary.transactions ?? "—";
+  document.querySelector("#i2cCompleteCount").textContent = summary.complete ?? "—";
+  document.querySelector("#i2cAddresses").textContent = summary.addresses?.length ? summary.addresses.join(", ") : "—";
+  document.querySelector("#i2cSclFrequency").textContent = formatFrequency(summary.estimated_scl_frequency_hz);
+  renderI2cArtifacts(payload.artifacts);
+  renderI2cRows(payload.rows);
+}
+
+async function submitI2cDecode() {
+  if (!i2cCapture || i2cDecodeRunning) return;
+  i2cDecodeRunning = true;
+  updateI2cControls();
+  i2cResultTitle.textContent = t("i2cDecoding");
+  const formData = new FormData();
+  formData.append("capture", i2cCapture);
+  ["time_col", "scl_col", "sda_col", "scl_threshold", "sda_threshold", "hysteresis_fraction"].forEach(name => {
+    const value = i2cForm.elements[name]?.value?.trim();
+    if (value) formData.append(name, value);
+  });
+  try {
+    const response = await fetch("/api/agents/i2c-automation/decodes", { method: "POST", body: formData });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || t("requestFailed"));
+    showToast(t("i2cDecodeStarted"));
+    i2cEventSource = new EventSource(`/api/runs/${payload.run_id}/events`);
+    i2cEventSource.onmessage = message => {
+      const event = JSON.parse(message.data);
+      if (event.type === "progress") i2cResultTitle.textContent = event.message;
+      if (event.type === "completed") {
+        renderI2cResult(event);
+        showToast(t("i2cDecodeCompleted"));
+        i2cDecodeRunning = false;
+        updateI2cControls();
+        i2cEventSource.close();
+      }
+      if (event.type === "error") {
+        showToast(event.message || t("i2cDecodeFailed"));
+        i2cResultTitle.textContent = t("i2cDecodeFailed");
+        i2cDecodeRunning = false;
+        updateI2cControls();
+        i2cEventSource.close();
+      }
+    };
+    i2cEventSource.onerror = () => {
+      if (!i2cDecodeRunning) return;
+      showToast(t("connectionInterrupted"));
+      i2cDecodeRunning = false;
+      updateI2cControls();
+      i2cEventSource.close();
+    };
+  } catch (error) {
+    showToast(error.message || t("cannotConnect"));
+    i2cResultTitle.textContent = t("i2cDecodeFailed");
+    i2cDecodeRunning = false;
+    updateI2cControls();
+  }
+}
+
+i2cCaptureInput.addEventListener("change", () => {
+  const file = i2cCaptureInput.files?.[0];
+  if (!file) return;
+  if (!file.name.toLowerCase().endsWith(".csv")) {
+    showToast(t("i2cInvalidCsv"));
+    i2cCaptureInput.value = "";
+    return;
+  }
+  i2cCapture = file;
+  selectedI2cCapture.classList.remove("is-hidden");
+  selectedI2cName.textContent = file.name;
+  selectedI2cMeta.textContent = `${(file.size / 1024).toFixed(1)} KB`;
+  showToast(t("i2cCsvSelected"));
+  updateI2cControls();
+});
+document.querySelector("#removeI2cCapture").addEventListener("click", () => {
+  i2cCapture = undefined;
+  i2cCaptureInput.value = "";
+  selectedI2cCapture.classList.add("is-hidden");
+  updateI2cControls();
+});
+i2cForm.addEventListener("submit", event => { event.preventDefault(); submitI2cDecode(); });
 applyTranslations();

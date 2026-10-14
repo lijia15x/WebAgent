@@ -7,7 +7,7 @@ from typing import Literal
 from urllib.parse import quote
 from uuid import uuid4
 
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile, status
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -30,11 +30,13 @@ from pdf_to_yaml_agent.reference_store import (
 
 from .agent_service import AgentBusyError, agent_service
 from .mrc_service import MrcBusyError, mrc_service
+from .i2c_service import I2cBusyError, I2cDecodeOptions, i2c_service
 
 
 MAX_PDF_BYTES = 100 * 1024 * 1024
 MAX_REFERENCE_BYTES = 20 * 1024 * 1024
 MAX_REFERENCE_FILES = 10
+MAX_I2C_CAPTURE_BYTES = 100 * 1024 * 1024
 DEFAULT_AUTHORING_GUIDE = (
     Path(__file__).resolve().parents[2]
     / ".temp"
@@ -101,6 +103,12 @@ async def list_agents() -> list[dict]:
             "name": "PDF-to-YAML Architecture",
             "description": "Convert I2C/I3C architecture PDFs into validated YAML.",
             "status": "ready",
+        },
+        {
+            "id": i2c_service.agent_id,
+            "name": "I2C Automation",
+            "description": "Decode oscilloscope CSV captures into I2C/SMBus transactions.",
+            "status": i2c_service.status,
         },
     ]
 
@@ -355,6 +363,63 @@ async def generate_pdf_yaml_stream(pdf: UploadFile = File(...)) -> StreamingResp
     )
 
 
+@app.post("/api/agents/i2c-automation/decodes", status_code=status.HTTP_202_ACCEPTED)
+async def submit_i2c_decode(
+    capture: UploadFile = File(...),
+    time_col: str | None = Form(default=None),
+    scl_col: str | None = Form(default=None),
+    sda_col: str | None = Form(default=None),
+    scl_threshold: float | None = Form(default=None),
+    sda_threshold: float | None = Form(default=None),
+    hysteresis_fraction: float = Form(default=0.05),
+) -> dict:
+    if capture.filename and not capture.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="I2C capture must be a CSV file")
+    if hysteresis_fraction < 0 or hysteresis_fraction > 0.5:
+        raise HTTPException(
+            status_code=400,
+            detail="hysteresis_fraction must be between 0 and 0.5",
+        )
+
+    source_name, upload_path = i2c_service.prepare_upload_path(capture.filename)
+    await _save_upload(capture, upload_path, MAX_I2C_CAPTURE_BYTES)
+    try:
+        run_id = await i2c_service.submit(
+            upload_path,
+            source_name,
+            I2cDecodeOptions(
+                time_col=time_col,
+                scl_col=scl_col,
+                sda_col=sda_col,
+                scl_threshold=scl_threshold,
+                sda_threshold=sda_threshold,
+                hysteresis_fraction=hysteresis_fraction,
+            ),
+        )
+    except I2cBusyError as exc:
+        upload_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"run_id": run_id, "status": "running"}
+
+
+@app.get("/api/agents/i2c-automation/runs/{run_id}/artifacts/{file_name}")
+async def download_i2c_artifact(run_id: str, file_name: str) -> FileResponse:
+    try:
+        file_path = i2c_service.resolve_artifact(run_id, file_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Artifact not found") from exc
+    media_types = {
+        ".csv": "text/csv",
+        ".json": "application/json",
+        ".txt": "text/plain",
+    }
+    return FileResponse(
+        file_path,
+        media_type=media_types.get(file_path.suffix.lower(), "application/octet-stream"),
+        filename=file_path.name,
+    )
+
+
 @app.post("/api/agents/{agent_id}/messages", status_code=status.HTTP_202_ACCEPTED)
 async def submit_message(agent_id: str, request: MessageRequest) -> dict:
     if agent_id != agent_service.agent_id:
@@ -461,7 +526,7 @@ async def set_mrc_automation(request: AutomationRequest) -> dict:
 
 @app.get("/api/runs/{run_id}/events")
 async def stream_events(run_id: str, request: Request) -> StreamingResponse:
-    run = agent_service.get_run(run_id) or mrc_service.get_run(run_id)
+    run = agent_service.get_run(run_id) or mrc_service.get_run(run_id) or i2c_service.get_run(run_id)
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
 
