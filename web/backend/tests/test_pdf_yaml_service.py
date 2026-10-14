@@ -387,7 +387,7 @@ class PdfYamlGenerationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("only the SMB C[10] path", ask.await_args_list[0].args[0])
         self.assertEqual("guide", copied_guide_content)
         self.assertEqual([], second_files)
-        self.assertEqual(900.0, ask.await_args_list[0].kwargs["timeout"])
+        self.assertEqual(1800.0, ask.await_args_list[0].kwargs["timeout"])
         self.assertEqual(300.0, ask.await_args_list[1].kwargs["timeout"])
         self.assertIn("minimal RFC 6902-style JSON patch", repair_prompt)
         self.assertIn("Never remove boards, elements, ports, or connections", repair_prompt)
