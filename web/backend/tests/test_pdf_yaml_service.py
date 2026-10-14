@@ -77,7 +77,7 @@ class PdfYamlServiceTests(unittest.TestCase):
 
         self.assertIn("selected Acme SMBus architecture", prompt)
         self.assertIn("Figure 3-2. Acme Modular SMBus Architecture", prompt)
-        self.assertIn("Figure 3-1. Acme SMBus Architecture", prompt)
+        self.assertNotIn("Figure 3-1. Acme SMBus Architecture", prompt)
         self.assertNotIn("Johnson City", prompt)
         self.assertNotIn("Figure 12-7", prompt)
         self.assertIn("not authoritative for content scope", prompt)
@@ -92,7 +92,7 @@ class PdfYamlServiceTests(unittest.TestCase):
         self.assertIn("guide.md", prompt)
         self.assertIn("example.yml", prompt)
 
-    def test_extracts_modular_and_same_product_base_pages(self) -> None:
+    def test_extracts_only_modular_page_when_available(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "source.pdf"
             filtered = Path(directory) / "filtered.pdf"
@@ -104,8 +104,35 @@ class PdfYamlServiceTests(unittest.TestCase):
 
         self.assertEqual("Acme", selection.product_name)
         self.assertTrue(selection.target.modular)
-        self.assertEqual([1, 2], [figure.page_number for figure in selection.figures])
-        self.assertEqual(2, page_count)
+        self.assertEqual([2], [figure.page_number for figure in selection.figures])
+        self.assertEqual(1, page_count)
+
+    def test_falls_back_to_smbus_architecture_figure_page(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source.pdf"
+            filtered = Path(directory) / "filtered.pdf"
+            document = pymupdf.open()
+            try:
+                non_figure_page = document.new_page()
+                non_figure_page.insert_text(
+                    (72, 72), "Modular SMBus Architecture overview"
+                )
+                base_page = document.new_page()
+                base_page.insert_text(
+                    (72, 72), "Figure 7-1. Acme SMBus Architecture"
+                )
+                document.save(source)
+            finally:
+                document.close()
+
+            selection = extract_architecture_pages(source, filtered)
+            with pymupdf.open(filtered) as document:
+                page_count = document.page_count
+
+        self.assertEqual("Acme", selection.product_name)
+        self.assertFalse(selection.target.modular)
+        self.assertEqual([2], [figure.page_number for figure in selection.figures])
+        self.assertEqual(1, page_count)
 
     def test_strips_yaml_markdown_fence(self) -> None:
         self.assertEqual(VALID_YAML.strip(), strip_yaml_fence(f"```yaml\n{VALID_YAML}```"))

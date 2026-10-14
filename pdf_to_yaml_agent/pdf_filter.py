@@ -91,12 +91,7 @@ def extract_architecture_pages(
             (candidate for candidate in candidates if candidate.modular),
             candidates[0],
         )
-        family = target.product_name.casefold()
-        selected = tuple(
-            candidate
-            for candidate in candidates
-            if candidate.product_name.casefold() == family
-        )
+        selected = (target,)
 
         reduced = pymupdf.open()
         try:

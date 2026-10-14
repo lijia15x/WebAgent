@@ -71,12 +71,12 @@ def build_generation_prompt(
     )
     return f"""Convert the selected {selection.product_name} SMBus architecture into a compliant board-level I2C/I3C architecture YAML file.
 
-The attached source, {source_name}, has already been reduced to these relevant figure pages from the original PDF:
+The attached source, {source_name}, has already been reduced to the selected figure page from the original PDF:
 {figures}
 
 The authoritative target is: {selection.target.caption}
 
-The target figure is authoritative for architecture content and scope. When both modular and base SMBus architecture figures are attached, convert the modular figure and use the base figure only to clarify shared labels, part numbers, addresses, and visually ambiguous common paths. Do not copy base-figure connections that differ from the modular target. If no modular figure is available, convert the selected base SMBus architecture figure.
+The target figure is authoritative for architecture content and scope. A modular SMBus architecture figure is selected when available; otherwise, the selected base SMBus architecture figure is used.
 
 The other attached files ({references}) are normative authoring and representation references. Follow their YAML schema, field choices, ID conventions, connection modeling, ordering conventions, and level of detail. An existing architecture YAML reference, including a .yml, .yaml, or YAML-formatted .txt file, is an example of how to represent the diagram; it is not authoritative for content scope. Do not copy its limited topology or stop at one example bus path. Add every source-supported board, element, port, and connection needed to represent the complete authoritative target figure.
 
