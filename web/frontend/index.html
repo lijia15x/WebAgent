@@ -234,6 +234,7 @@
                 <div class="copilot-activity">
                   <div class="copilot-activity-heading"><span class="copilot-activity-dot" id="copilotActivityDot" aria-hidden="true"></span><strong data-i18n="copilotActivity">Copilot activity</strong></div>
                   <ol id="copilotActivityList" aria-live="polite"><li data-i18n="copilotWaiting">Waiting to start</li></ol>
+                  <button class="copilot-history-button" type="button" id="showCopilotHistory" data-i18n="viewCopilotHistory" disabled>View full history</button>
                 </div>
               </div>
               <small class="engine-note" data-i18n="enginePending">The PDF and reference files are sent to Copilot for this conversion only.</small>
@@ -330,6 +331,10 @@
   <dialog class="email-dialog" id="emailDialog">
     <header><strong data-i18n="emailPreview">Email preview</strong><button class="icon-button" type="button" id="closeEmailDialog" aria-label="Close" data-i18n-aria="close">×</button></header>
     <div class="email-dialog-body" id="emailDialogBody"></div>
+  </dialog>
+  <dialog class="copilot-history-dialog" id="copilotHistoryDialog">
+    <header><div><strong data-i18n="copilotHistoryTitle">Copilot activity history</strong><small data-i18n="copilotHistoryHint">Visible status and process messages from the current conversion</small></div><button class="icon-button" type="button" id="closeCopilotHistory" aria-label="Close" data-i18n-aria="close">×</button></header>
+    <ol class="copilot-history-list" id="copilotHistoryList"></ol>
   </dialog>
   <dialog class="test-mail-dialog" id="testMailDialog">
     <form id="testMailForm">

@@ -217,6 +217,9 @@ const translations = {
     elapsedTime: "已用时间",
     copilotActivity: "Copilot 运行动态",
     copilotWaiting: "等待开始",
+    viewCopilotHistory: "查看全部记录",
+    copilotHistoryTitle: "Copilot 运行记录",
+    copilotHistoryHint: "当前转换中可见的状态与过程消息",
     activityContextReady: "已提交精简架构图和参考文件",
     activityAnalyzing: "Copilot 正在分析板卡、器件和连接",
     activityInspectingInputs: "Copilot 正在检查输入内容",
@@ -465,6 +468,9 @@ const translations = {
     elapsedTime: "Elapsed time",
     copilotActivity: "Copilot activity",
     copilotWaiting: "Waiting to start",
+    viewCopilotHistory: "View full history",
+    copilotHistoryTitle: "Copilot activity history",
+    copilotHistoryHint: "Visible status and process messages from the current conversion",
     activityContextReady: "Reduced architecture and references submitted",
     activityAnalyzing: "Copilot is analyzing boards, elements, and connections",
     activityInspectingInputs: "Copilot is inspecting the input",
@@ -927,6 +933,9 @@ const generationProgressBar = document.querySelector("#generationProgressBar");
 const generationTimer = document.querySelector("#generationTimer");
 const copilotActivityDot = document.querySelector("#copilotActivityDot");
 const copilotActivityList = document.querySelector("#copilotActivityList");
+const showCopilotHistoryButton = document.querySelector("#showCopilotHistory");
+const copilotHistoryDialog = document.querySelector("#copilotHistoryDialog");
+const copilotHistoryList = document.querySelector("#copilotHistoryList");
 const generationSteps = Array.from(document.querySelectorAll("[data-generation-step]"));
 const yamlResult = document.querySelector("#yamlResult");
 const yamlPreview = document.querySelector("#yamlPreview");
@@ -950,6 +959,7 @@ let generatedYaml = "";
 let generatedFileName = "architecture.yml";
 let generationStartedAt;
 let generationTimerId;
+let copilotHistory = [];
 
 const copilotActivityKeys = {
   context_ready: "activityContextReady",
@@ -961,11 +971,31 @@ const copilotActivityKeys = {
 };
 
 function resetCopilotActivity() {
+  copilotHistory = [];
+  copilotHistoryList.replaceChildren();
+  showCopilotHistoryButton.disabled = true;
   copilotActivityList.replaceChildren();
   const item = document.createElement("li");
   item.dataset.i18n = "copilotWaiting";
   item.textContent = t("copilotWaiting");
   copilotActivityList.append(item);
+}
+
+function appendCopilotHistory(message, type) {
+  const elapsed = generationStartedAt === undefined
+    ? "00:00"
+    : formatElapsed(performance.now() - generationStartedAt);
+  copilotHistory.push({ elapsed, message, type });
+  const item = document.createElement("li");
+  item.className = type === "process" ? "is-process" : "is-activity";
+  const time = document.createElement("time");
+  time.textContent = elapsed;
+  const text = document.createElement("span");
+  text.textContent = message;
+  item.append(time, text);
+  copilotHistoryList.append(item);
+  showCopilotHistoryButton.disabled = false;
+  if (copilotHistoryDialog.open) item.scrollIntoView({ block: "nearest" });
 }
 
 function appendCopilotActivity(activity) {
@@ -980,6 +1010,7 @@ function appendCopilotActivity(activity) {
   item.dataset.i18n = key;
   item.textContent = message;
   copilotActivityList.append(item);
+  appendCopilotHistory(message, "activity");
   while (copilotActivityList.children.length > 4) copilotActivityList.firstElementChild.remove();
 }
 
@@ -993,8 +1024,17 @@ function appendCopilotProcess(message) {
   item.className = "is-process";
   item.textContent = text;
   copilotActivityList.append(item);
+  appendCopilotHistory(text, "process");
   while (copilotActivityList.children.length > 4) copilotActivityList.firstElementChild.remove();
 }
+
+showCopilotHistoryButton.addEventListener("click", () => {
+  if (!copilotHistory.length) return;
+  copilotHistoryDialog.showModal();
+  copilotHistoryList.lastElementChild?.scrollIntoView({ block: "end" });
+});
+
+document.querySelector("#closeCopilotHistory").addEventListener("click", () => copilotHistoryDialog.close());
 
 function formatFileSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
