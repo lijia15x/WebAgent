@@ -1,0 +1,744 @@
+version: 1
+
+boards:
+  - id: dc_scm
+    label: "DC-SCM"
+  - id: aggregator
+    label: "Aggregator"
+  - id: hpm
+    label: "HPM"
+  - id: pdb
+    label: "PDB"
+  - id: cem_riser
+    label: "CEM Cabled Riser"
+
+elements:
+  - id: bmc_ast2600
+    board: dc_scm
+    type: bmc
+    part: AST2600
+    ports:
+      - id: pA_C16
+        direction: bidirectional
+        label: "SMB_FRU (SMB C[16])"
+        electrical_class: active
+        i2c_role_capabilities: ["controller"]   # BMC is the host controller on many buses
+      - id: pB_C12
+        direction: bidirectional
+        label: "SMB_CHASSIS (SMB C[12])"
+        electrical_class: active
+        i2c_role_capabilities: ["controller"]
+      - id: pC_C14
+        direction: bidirectional
+        label: "SMB_CPLD_UPDATE (SMB C[14])"
+        electrical_class: active
+        i2c_role_capabilities: ["controller"]
+      - id: pD_C7
+        direction: bidirectional
+        label: "SMB_TEMP (SMB C[7])"
+        electrical_class: active
+        i2c_role_capabilities: ["controller"]
+      - id: pE_C6
+        direction: bidirectional
+        label: "PMBUS2 (SMB C[6])"
+        electrical_class: active
+        i2c_role_capabilities: ["controller"]
+      - id: pF_C11
+        direction: bidirectional
+        label: "SMB_SCM (SMB C[11]); MMIO, PLD_UPDATE no PFR"
+        electrical_class: active
+        i2c_role_capabilities: ["controller"]
+      - id: pG_C8
+        direction: bidirectional
+        label: "PMBUS1 (SMB C[8])"
+        electrical_class: active
+        i2c_role_capabilities: ["controller"]
+      - id: pH_I3C3
+        direction: bidirectional
+        label: "I3C_MNG_PFR (I3C3/C)"
+        electrical_class: active
+        i2c_role_capabilities: ["controller"]
+      - id: pI_C10
+        direction: bidirectional
+        label: "SMB_MPIC (SMB C[10])"
+        electrical_class: active
+        i2c_role_capabilities: ["controller"]
+      - id: pJ_C15
+        direction: bidirectional
+        label: "Spare (SMB C[15])"
+        electrical_class: active
+        i2c_role_capabilities: ["controller"]
+      - id: pK_C5
+        direction: bidirectional
+        label: "Spare (SMB C[5])"
+        electrical_class: active
+        i2c_role_capabilities: ["controller"]
+      - id: pL_C13
+        direction: bidirectional
+        label: "SMB_PIROM (SMB C[13])"
+        electrical_class: active
+        i2c_role_capabilities: ["controller"]
+      - id: pM_I3C2
+        direction: bidirectional
+        label: "I3C_MNG (I3C2/C)"
+        electrical_class: active
+        i2c_role_capabilities: ["controller"]
+      - id: pN_I3C1
+        direction: bidirectional
+        label: "I3C_SPD (I3C1/C)"
+        electrical_class: active
+        i2c_role_capabilities: ["controller"]
+      - id: pO_I3C5
+        direction: bidirectional
+        label: "I3C_DBG (I3C5/C)"
+        electrical_class: active
+        i2c_role_capabilities: ["controller"]
+      - id: pP_C9
+        direction: bidirectional
+        label: "SMB_BMC_HOST (SMB C[9])"
+        electrical_class: active
+        i2c_role_capabilities: ["controller"]
+      - id: pQ_I3C6
+        direction: bidirectional
+        label: "I3C_PCIe (I3C6/C)"
+        electrical_class: active
+        i2c_role_capabilities: ["controller"]
+      - id: pR_I3C4
+        direction: bidirectional
+        label: "I3C_PCIe2 (I3C4/C)"
+        electrical_class: active
+        i2c_role_capabilities: ["controller"]
+    port_display_order:
+      [pA_C16, pB_C12, pC_C14, pD_C7, pE_C6, pF_C11, pG_C8, pH_I3C3, pI_C10,
+       pJ_C15, pK_C5, pL_C13, pM_I3C2, pN_I3C1, pO_I3C5, pP_C9, pQ_I3C6, pR_I3C4]
+
+  - id: dc_sci_pad_dcsccm
+    board: dc_scm
+    type: pad
+    part: "pad"
+    ports:
+      - id: land
+        direction: bidirectional
+        electrical_class: passive
+        i2c_role_capabilities: ["passive"]
+    port_display_order: [land]
+
+  - id: agg_dc_sci_conn
+    board: aggregator
+    type: connector
+    part: "DC-SCI Edge"
+    mechanical: "DC-SCI Edge"
+    ports:
+      - id: qA    # brief listing, but full set preserved below
+        direction: bidirectional
+        label: "I2C_3V3_0"
+        electrical_class: passive
+        i2c_role_capabilities: ["passive"]
+      - id: qB
+        direction: bidirectional
+        label: "I2C_3V3_5"
+        electrical_class: passive
+        i2c_role_capabilities: ["passive"]
+      - id: qC
+        direction: bidirectional
+        label: "I2C_I3C_1V8_13"
+        electrical_class: passive
+        i2c_role_capabilities: ["passive"]
+      - id: qD
+        direction: bidirectional
+        label: "I2C_3V3_4"
+        electrical_class: passive
+        i2c_role_capabilities: ["passive"]
+      - id: qE
+        direction: bidirectional
+        label: "I2C_3V3_9"
+        electrical_class: passive
+        i2c_role_capabilities: ["passive"]
+      - id: qF
+        direction: bidirectional
+        label: ""
+        electrical_class: passive
+        i2c_role_capabilities: ["passive"]
+      - id: qG
+        direction: bidirectional
+        label: "I2C_3V3_6"
+        electrical_class: passive
+        i2c_role_capabilities: ["passive"]
+      - id: qH
+        direction: bidirectional
+        label: ""
+        electrical_class: passive
+        i2c_role_capabilities: ["passive"]
+      - id: qI
+        direction: bidirectional
+        label: "I2C_3V3_1"
+        electrical_class: passive
+        i2c_role_capabilities: ["passive"]
+      - id: qJ
+        direction: bidirectional
+        label: "I2C_I3C_1V8_14"
+        electrical_class: passive
+        i2c_role_capabilities: ["passive"]
+      - id: qK
+        direction: bidirectional
+        label: "I2C_I3C_1V8_15"
+        electrical_class: passive
+        i2c_role_capabilities: ["passive"]
+      - id: qL
+        direction: bidirectional
+        label: "I2C_3V3_3"
+        electrical_class: passive
+        i2c_role_capabilities: ["passive"]
+      - id: qM
+        direction: bidirectional
+        label: "I2C_I3C_1V0_19"
+        electrical_class: passive
+        i2c_role_capabilities: ["passive"]
+      - id: qN
+        direction: bidirectional
+        label: "I2C_I3C_1V0_18"
+        electrical_class: passive
+        i2c_role_capabilities: ["passive"]
+      - id: qO
+        direction: bidirectional
+        label: "I2C_I3C_1V8_17"
+        electrical_class: passive
+        i2c_role_capabilities: ["passive"]
+      - id: qP
+        direction: bidirectional
+        label: "I2C_3V3_2"
+        electrical_class: passive
+        i2c_role_capabilities: ["passive"]
+      - id: qQ
+        direction: bidirectional
+        label: "I2C_I3C_1V8_16"
+        electrical_class: passive
+        i2c_role_capabilities: ["passive"]
+      - id: qR
+        direction: bidirectional
+        label: "I2C_I3C_1V8_12"
+        electrical_class: passive
+        i2c_role_capabilities: ["passive"]
+    port_display_order: [qA, qB, qC, qD, qE, qF, qG, qH, qI, qJ, qK, qL, qM, qN, qO, qP, qQ, qR]
+
+  - id: agg_mpic_mux_pca9546_0x77
+    board: aggregator
+    type: mux
+    part: PCA9546
+    address: "0x77"
+    ports:
+      - id: upstream
+        direction: bidirectional
+        electrical_class: active
+        i2c_role_capabilities: ["target"]   # upstream side behaves as controller onto branches -- raguillo manually overrided this and modeled it as a target.
+      - id: ch0
+        direction: bidirectional
+        index: 0
+        electrical_class: active
+        i2c_role_capabilities: ["redriver"]     # branches propagate controller signaling
+      - id: ch1
+        direction: bidirectional
+        index: 1
+        electrical_class: active
+        i2c_role_capabilities: ["redriver"]
+      - id: ch2
+        direction: bidirectional
+        index: 2
+        electrical_class: active
+        i2c_role_capabilities: ["redriver"]
+      - id: ch3
+        direction: bidirectional
+        index: 3
+        electrical_class: active
+        i2c_role_capabilities: ["redriver"]
+    port_display_order: [upstream, ch3, ch2, ch1, ch0]
+
+  - id: dc_sci_pad_agg
+    board: aggregator
+    type: pad
+    part: "pad"
+    ports:
+      - id: land
+        direction: bidirectional
+        electrical_class: passive
+        i2c_role_capabilities: ["passive"]
+    port_display_order: [land]
+
+  - id: hpm_dc_sci_conn
+    board: hpm
+    type: connector
+    part: "DC-SCI Edge"
+    mechanical: "DC-SCI Edge"
+    ports:
+      - { id: qA, direction: bidirectional, label: "I2C_3V3_0",       electrical_class: passive, i2c_role_capabilities: ["passive"] }
+      - { id: qB, direction: bidirectional, label: "I2C_3V3_5",       electrical_class: passive, i2c_role_capabilities: ["passive"] }
+      - { id: qC, direction: bidirectional, label: "I2C_I3C_1V8_13",  electrical_class: passive, i2c_role_capabilities: ["passive"] }
+      - { id: qD, direction: bidirectional, label: "I2C_3V3_4",       electrical_class: passive, i2c_role_capabilities: ["passive"] }
+      - { id: qE, direction: bidirectional, label: "I2C_3V3_9",       electrical_class: passive, i2c_role_capabilities: ["passive"] }
+      - { id: qF, direction: bidirectional, label: "",                electrical_class: passive, i2c_role_capabilities: ["passive"] }
+      - { id: qG, direction: bidirectional, label: "I2C_3V3_6",       electrical_class: passive, i2c_role_capabilities: ["passive"] }
+      - { id: qH, direction: bidirectional, label: "",                electrical_class: passive, i2c_role_capabilities: ["passive"] }
+      - { id: qI, direction: bidirectional, label: "I2C_3V3_1",       electrical_class: passive, i2c_role_capabilities: ["passive"] }
+      - { id: qJ, direction: bidirectional, label: "I2C_I3C_1V8_14",  electrical_class: passive, i2c_role_capabilities: ["passive"] }
+      - { id: qK, direction: bidirectional, label: "I2C_I3C_1V8_15",  electrical_class: passive, i2c_role_capabilities: ["passive"] }
+      - { id: qL, direction: bidirectional, label: "I2C_3V3_3",       electrical_class: passive, i2c_role_capabilities: ["passive"] }
+      - { id: qM, direction: bidirectional, label: "I2C_I3C_1V0_19",  electrical_class: passive, i2c_role_capabilities: ["passive"] }
+      - { id: qN, direction: bidirectional, label: "I2C_I3C_1V0_18",  electrical_class: passive, i2c_role_capabilities: ["passive"] }
+      - { id: qO, direction: bidirectional, label: "I2C_I3C_1V8_17",  electrical_class: passive, i2c_role_capabilities: ["passive"] }
+      - { id: qP, direction: bidirectional, label: "I2C_3V3_2",       electrical_class: passive, i2c_role_capabilities: ["passive"] }
+      - { id: qQ, direction: bidirectional, label: "I2C_I3C_1V8_16",  electrical_class: passive, i2c_role_capabilities: ["passive"] }
+      - { id: qR, direction: bidirectional, label: "I2C_I3C_1V8_12",  electrical_class: passive, i2c_role_capabilities: ["passive"] }
+    port_display_order: [qA, qB, qC, qD, qE, qF, qG, qH, qI, qJ, qK, qL, qM, qN, qO, qP, qQ, qR]
+
+  - id: hpm_mpic_buffer_pca9617
+    board: hpm
+    type: buffer
+    part: PCA9617
+    ports:
+      - id: A
+        direction: bidirectional
+        electrical_class: active
+        i2c_role_capabilities: ["redriver"]
+      - id: B
+        direction: bidirectional
+        electrical_class: active
+        i2c_role_capabilities: ["redriver"]
+    port_display_order: [A, B]
+
+  - id: hpm_mpic_mux_pca9546_0x72
+    board: hpm
+    type: mux
+    part: PCA9546
+    address: "0x72"
+    ports:
+      - id: upstream
+        direction: bidirectional
+        electrical_class: active
+        i2c_role_capabilities: ["target"]   # upstream side behaves as controller onto branches -- raguillo manually overrided this and modeled it as a target.
+      - id: ch0
+        direction: bidirectional
+        index: 0
+        electrical_class: active
+        i2c_role_capabilities: ["redriver"]
+      - id: ch1
+        direction: bidirectional
+        index: 1
+        electrical_class: active
+        i2c_role_capabilities: ["redriver"]
+      - id: ch2
+        direction: bidirectional
+        index: 2
+        electrical_class: active
+        i2c_role_capabilities: ["redriver"]
+      - id: ch3
+        direction: bidirectional
+        index: 3
+        electrical_class: active
+        i2c_role_capabilities: ["redriver"]
+    port_display_order: [upstream, ch3, ch2, ch1, ch0]
+
+  - id: hpm_mpic_mux_pca9546_0x73
+    board: hpm
+    type: mux
+    part: PCA9546
+    address: "0x73"
+    ports:
+      - id: upstream
+        direction: bidirectional
+        electrical_class: active
+        i2c_role_capabilities: ["target"]   # upstream side behaves as controller onto branches -- raguillo manually overrided this and modeled it as a target.
+      - id: ch0
+        direction: bidirectional
+        index: 0
+        electrical_class: active
+        i2c_role_capabilities: ["redriver"]
+      - id: ch1
+        direction: bidirectional
+        index: 1
+        electrical_class: active
+        i2c_role_capabilities: ["redriver"]
+      - id: ch2
+        direction: bidirectional
+        index: 2
+        electrical_class: active
+        i2c_role_capabilities: ["redriver"]
+      - id: ch3
+        direction: bidirectional
+        index: 3
+        electrical_class: active
+        i2c_role_capabilities: ["redriver"]
+    port_display_order: [upstream, ch3, ch2, ch1, ch0]
+
+  - id: hpm_mpic_conn_picpwr_2x6
+    board: hpm
+    type: connector
+    part: "PICPWR 1A 2x6"
+    mechanical: "PICPWR 1A 2x6"
+    ports:
+      - id: bus
+        direction: bidirectional
+        electrical_class: passive
+        i2c_role_capabilities: ["passive"]
+    port_display_order: [bus]
+
+  - id: pdb_mpic_conn_picpwr_2x6
+    board: pdb
+    type: connector
+    part: "PICPWR 1A 2x6"
+    mechanical: "PICPWR 1A 2x6"
+    ports:
+      - id: bus
+        direction: bidirectional
+        electrical_class: passive
+        i2c_role_capabilities: ["passive"]
+    port_display_order: [bus]
+
+  - id: pdb_mpic_mux_pca9548_0x70
+    board: pdb
+    type: mux
+    part: PCA9548
+    address: "0x70"
+    ports:
+      - id: upstream
+        direction: bidirectional
+        electrical_class: active
+        i2c_role_capabilities: ["target"]   # upstream side behaves as controller onto branches -- raguillo manually overrided this and modeled it as a target.
+      - id: ch0
+        direction: bidirectional
+        index: 0
+        electrical_class: active
+        i2c_role_capabilities: ["redriver"]
+      - id: ch1
+        direction: bidirectional
+        index: 1
+        electrical_class: active
+        i2c_role_capabilities: ["redriver"]
+      - id: ch2
+        direction: bidirectional
+        index: 2
+        electrical_class: active
+        i2c_role_capabilities: ["redriver"]
+      - id: ch3
+        direction: bidirectional
+        index: 3
+        electrical_class: active
+        i2c_role_capabilities: ["redriver"]
+      - id: ch4
+        direction: bidirectional
+        index: 4
+        electrical_class: active
+        i2c_role_capabilities: ["redriver"]
+      - id: ch5
+        direction: bidirectional
+        index: 5
+        electrical_class: active
+        i2c_role_capabilities: ["redriver"]
+      - id: ch6
+        direction: bidirectional
+        index: 6
+        electrical_class: active
+        i2c_role_capabilities: ["redriver"]
+      - id: ch7
+        direction: bidirectional
+        index: 7
+        electrical_class: active
+        i2c_role_capabilities: ["redriver"]
+    port_display_order: [upstream, ch7, ch6, ch5, ch4, ch3, ch2, ch1, ch0]
+
+  - id: pdb_gpio_expander_pca9554_0x26
+    board: pdb
+    type: gpio_expander
+    part: PCA9554
+    address: "0x26"
+    ports:
+      - id: upstream
+        direction: bidirectional
+        electrical_class: active
+        i2c_role_capabilities: ["target"]      # expander is a target device
+      - id: p0
+        direction: bidirectional
+        index: 0
+      - id: p1
+        direction: bidirectional
+        index: 1
+      - id: p2
+        direction: bidirectional
+        index: 2
+      - id: p3
+        direction: bidirectional
+        index: 3
+      - id: p4
+        direction: bidirectional
+        index: 4
+      - id: p5
+        direction: bidirectional
+        index: 5
+      - id: p6
+        direction: bidirectional
+        index: 6
+      - id: p7
+        direction: bidirectional
+        index: 7
+    port_display_order: [upstream, p7, p6, p5, p4, p3, p2, p1, p0]
+
+  - id: pdb_mpic_conn_picpwr_2x3
+    board: pdb
+    type: connector
+    part: "PICPWR 2x3"
+    mechanical: "PICPWR 2x3"
+    ports:
+      - id: bus
+        direction: bidirectional
+        electrical_class: passive
+        i2c_role_capabilities: ["passive"]
+    port_display_order: [bus]
+
+  - id: riser_mpic_conn_picpwr_2x3
+    board: cem_riser
+    type: connector
+    part: "PICPWR 2x3"
+    mechanical: "PICPWR 2x3"
+    ports:
+      - id: bus
+        direction: bidirectional
+        electrical_class: passive
+        i2c_role_capabilities: ["passive"]
+    port_display_order: [bus]
+
+  - id: riser_fru_24c02_0x50
+    board: cem_riser
+    type: fru_eeprom
+    part: 24C02
+    address: "0x50"
+    ports:
+      - id: upstream
+        direction: bidirectional
+        electrical_class: active
+        i2c_role_capabilities: ["target"]
+    port_display_order: [upstream]
+
+  - id: riser_temp_tmp75_0x48
+    board: cem_riser
+    type: temp_sensor
+    part: TMP75
+    address: "0x48"
+    ports:
+      - id: upstream
+        direction: bidirectional
+        electrical_class: active
+        i2c_role_capabilities: ["target"]
+    port_display_order: [upstream]
+
+  - id: riser_gpio_expander_pca9536_0x41
+    board: cem_riser
+    type: gpio_expander
+    part: PCA9536
+    address: "0x41"
+    ports:
+      - id: upstream
+        direction: bidirectional
+        electrical_class: active
+        i2c_role_capabilities: ["target"]
+    port_display_order: [upstream]
+
+connections:
+  # DC-SCM electrical
+  - from: bmc_ast2600
+    from_port: pI_C10
+    to: dc_sci_pad_dcsccm
+    to_port: land
+    connection_type: internal_net
+    protocol: i2c
+    signal: SMB_MPIC
+    voltage_domain: 3v3_aux
+    speed_hz: 100000
+    from_role: controller
+    to_role: passive
+
+  # DC-SCM ↔ Aggregator mating (zero-length, dotted, no arrow)
+  - from: dc_sci_pad_dcsccm
+    from_port: land
+    to: agg_dc_sci_conn
+    to_port: qI
+    connection_type: mating
+    from_role: passive
+    to_role: passive
+
+  # Aggregator electrical
+  - from: agg_dc_sci_conn
+    from_port: qI
+    to: agg_mpic_mux_pca9546_0x77
+    to_port: upstream
+    connection_type: internal_net
+    protocol: i2c
+    signal: SMB_MPIC
+    voltage_domain: 3v3_aux
+    speed_hz: 100000
+    from_role: passive
+    to_role: target # raguillo overrode, was originally "controller"
+
+  - from: agg_mpic_mux_pca9546_0x77
+    from_port: ch0
+    to: dc_sci_pad_agg
+    to_port: land
+    connection_type: internal_net
+    protocol: i2c
+    signal: SMB_MPIC
+    voltage_domain: 3v3_aux
+    speed_hz: 100000
+    from_role: redriver
+    to_role: passive
+
+  # Aggregator ↔ HPM mating
+  - from: dc_sci_pad_agg
+    from_port: land
+    to: hpm_dc_sci_conn
+    to_port: qI
+    connection_type: mating
+    from_role: passive
+    to_role: passive
+
+  # HPM fan-out
+  - from: hpm_dc_sci_conn
+    from_port: qI
+    to: hpm_mpic_mux_pca9546_0x72
+    to_port: upstream
+    connection_type: internal_net
+    protocol: i2c
+    signal: SMB_MPIC
+    voltage_domain: 3v3_aux
+    speed_hz: 100000
+    from_role: passive
+    to_role: target # raguillo overrode, was originally "controller"
+
+  - from: hpm_dc_sci_conn
+    from_port: qI
+    to: hpm_mpic_mux_pca9546_0x73
+    to_port: upstream
+    connection_type: internal_net
+    protocol: i2c
+    signal: SMB_MPIC
+    voltage_domain: 3v3_aux
+    speed_hz: 100000
+    from_role: passive
+    to_role: target # raguillo overrode, was originally "controller"
+
+  - from: hpm_dc_sci_conn
+    from_port: qI
+    to: hpm_mpic_buffer_pca9617
+    to_port: A
+    connection_type: internal_net
+    protocol: i2c
+    signal: SMB_MPIC
+    voltage_domain: 3v3_aux
+    speed_hz: 100000
+    from_role: passive
+    to_role: redriver
+
+  - from: hpm_mpic_buffer_pca9617
+    from_port: B
+    to: hpm_mpic_conn_picpwr_2x6
+    to_port: bus
+    connection_type: internal_net
+    protocol: i2c
+    signal: SMB_MPIC
+    voltage_domain: 3v3_aux
+    speed_hz: 100000
+    from_role: redriver
+    to_role: passive
+
+  # HPM ↔ PDB cable
+  - from: hpm_mpic_conn_picpwr_2x6
+    from_port: bus
+    to: pdb_mpic_conn_picpwr_2x6
+    to_port: bus
+    connection_type: cable
+    medium: picpwr_cable
+    length_mm: 500
+    from_role: passive
+    to_role: passive
+
+  # PDB internal
+  - from: pdb_mpic_conn_picpwr_2x6
+    from_port: bus
+    to: pdb_mpic_mux_pca9548_0x70
+    to_port: upstream
+    connection_type: internal_net
+    protocol: i2c
+    signal: SMB_MPIC
+    voltage_domain: 3v3_aux
+    speed_hz: 100000
+    from_role: passive
+    to_role: target # raguillo overrode, was originally "controller"
+
+  - from: pdb_mpic_conn_picpwr_2x6
+    from_port: bus
+    to: pdb_gpio_expander_pca9554_0x26
+    to_port: upstream
+    connection_type: internal_net
+    protocol: i2c
+    signal: SMB_MPIC
+    voltage_domain: 3v3_aux
+    speed_hz: 100000
+    from_role: passive
+    to_role: target
+
+  - from: pdb_mpic_mux_pca9548_0x70
+    from_port: ch4
+    to: pdb_mpic_conn_picpwr_2x3
+    to_port: bus
+    connection_type: internal_net
+    protocol: i2c
+    signal: SMB_MPIC
+    voltage_domain: 3v3_aux
+    speed_hz: 100000
+    from_role: redriver
+    to_role: passive
+
+  # PDB ↔ CEM riser cable
+  - from: pdb_mpic_conn_picpwr_2x3
+    from_port: bus
+    to: riser_mpic_conn_picpwr_2x3
+    to_port: bus
+    connection_type: cable
+    medium: picpwr_cable
+    length_mm: 500
+    from_role: passive
+    to_role: passive
+
+  # Riser fan-out
+  - from: riser_mpic_conn_picpwr_2x3
+    from_port: bus
+    to: riser_fru_24c02_0x50
+    to_port: upstream
+    connection_type: internal_net
+    protocol: i2c
+    signal: SMB_MPIC
+    voltage_domain: 3v3_aux
+    speed_hz: 100000
+    from_role: passive
+    to_role: target
+
+  - from: riser_mpic_conn_picpwr_2x3
+    from_port: bus
+    to: riser_temp_tmp75_0x48
+    to_port: upstream
+    connection_type: internal_net
+    protocol: i2c
+    signal: SMB_MPIC
+    voltage_domain: 3v3_aux
+    speed_hz: 100000
+    from_role: passive
+    to_role: target
+
+  - from: riser_mpic_conn_picpwr_2x3
+    from_port: bus
+    to: riser_gpio_expander_pca9536_0x41
+    to_port: upstream
+    connection_type: internal_net
+    protocol: i2c
+    signal: SMB_MPIC
+    voltage_domain: 3v3_aux
+    speed_hz: 100000
+    from_role: passive
+    to_role: target

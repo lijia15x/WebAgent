@@ -92,6 +92,29 @@ class PdfYamlServiceTests(unittest.TestCase):
         self.assertIn("guide.md", prompt)
         self.assertIn("example.yml", prompt)
 
+    def test_prompt_scopes_reviewed_example_to_representation_technique(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source.pdf"
+            filtered = Path(directory) / "filtered.pdf"
+            write_architecture_pdf(source)
+            selection = extract_architecture_pages(source, filtered)
+
+        prompt = build_generation_prompt(
+            "filtered.pdf",
+            [
+                "references/guide.md",
+                "references/reviewed_example/reference.pdf",
+                "references/reviewed_example/I2C_architecure.yml",
+            ],
+            selection,
+        )
+
+        self.assertIn("human-reviewed worked example", prompt)
+        self.assertIn("only the SMB C[10] path", prompt)
+        self.assertIn("Inspect the pair together", prompt)
+        self.assertIn("do not assign an endpoint to a board merely because", prompt)
+        self.assertIn("sole authority for what to include", prompt)
+
     def test_extracts_only_modular_page_when_available(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "source.pdf"
@@ -314,7 +337,11 @@ class PdfYamlGenerationTests(unittest.IsolatedAsyncioTestCase):
                     self.assertTrue(all(Path(path).is_file() for path in files))
                     with pymupdf.open(files[0]) as document:
                         first_page_count = document.page_count
-                    copied_guide_content = Path(files[1]).read_text(encoding="utf-8")
+                    copied_guide_content = next(
+                        Path(path).read_text(encoding="utf-8")
+                        for path in files
+                        if Path(path).name == "guide.md"
+                    )
                 callback = kwargs.get("on_delta")
                 if callback is not None:
                     callback("output started")
@@ -344,7 +371,20 @@ class PdfYamlGenerationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(yaml.safe_load(VALID_YAML), yaml.safe_load(content))
         self.assertTrue(validation["valid"])
         self.assertEqual(2, ask.await_count)
-        self.assertEqual("guide.md", first_files[1].name)
+        self.assertEqual(
+            {
+                "source_smbus_figures.pdf",
+                "guide.md",
+                "reference.pdf",
+                "I2C_architecure.yml",
+            },
+            {path.name for path in first_files},
+        )
+        self.assertEqual(
+            "reviewed_example",
+            next(path.parent.name for path in first_files if path.name == "reference.pdf"),
+        )
+        self.assertIn("only the SMB C[10] path", ask.await_args_list[0].args[0])
         self.assertEqual("guide", copied_guide_content)
         self.assertEqual([], second_files)
         self.assertEqual(900.0, ask.await_args_list[0].kwargs["timeout"])
@@ -352,7 +392,7 @@ class PdfYamlGenerationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("minimal RFC 6902-style JSON patch", repair_prompt)
         self.assertIn("Never remove boards, elements, ports, or connections", repair_prompt)
         self.assertIn("_smbus_figures.pdf", first_files[0].name)
-        self.assertEqual(2, first_page_count)
+        self.assertEqual(1, first_page_count)
         self.assertEqual(workspace_paths[0], workspace_paths[1])
         self.assertTrue(all(not path.exists() for path in workspace_paths))
         stages = [stage for stage, _ in progress_events]

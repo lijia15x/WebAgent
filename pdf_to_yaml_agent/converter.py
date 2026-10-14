@@ -29,10 +29,27 @@ ProcessCallback = Callable[[str], Awaitable[None]]
 PDF_WORKSPACE_GUIDANCE = """Use the temporary request workspace actively. You may create analysis files and run read-only inspection commands inside it. Do not modify the source PDF or files under references. Do not access files outside this workspace. All analysis artifacts are temporary and must not be mentioned in the final response."""
 DEFAULT_GENERATION_TIMEOUT_SECONDS = 900.0
 DEFAULT_REPAIR_TIMEOUT_SECONDS = 300.0
+REVIEWED_EXAMPLE_DIRECTORY = Path(__file__).resolve().parent / "reference"
+REVIEWED_EXAMPLE_PDF = REVIEWED_EXAMPLE_DIRECTORY / "reference.pdf"
+REVIEWED_EXAMPLE_YAML = REVIEWED_EXAMPLE_DIRECTORY / "I2C_architecure.yml"
 
 
 class YamlGenerationError(RuntimeError):
     pass
+
+
+def reviewed_example_files() -> tuple[Path, Path]:
+    missing = [
+        path.name
+        for path in (REVIEWED_EXAMPLE_PDF, REVIEWED_EXAMPLE_YAML)
+        if not path.is_file()
+    ]
+    if missing:
+        raise YamlGenerationError(
+            "Reviewed PDF-to-YAML example is incomplete; missing: "
+            + ", ".join(missing)
+        )
+    return REVIEWED_EXAMPLE_PDF, REVIEWED_EXAMPLE_YAML
 
 
 def select_reference_files(reference_files: Sequence[Path]) -> list[Path]:
@@ -78,7 +95,11 @@ The authoritative target is: {selection.target.caption}
 
 The target figure is authoritative for architecture content and scope. A modular SMBus architecture figure is selected when available; otherwise, the selected base SMBus architecture figure is used.
 
-The other attached files ({references}) are normative authoring and representation references. Follow their YAML schema, field choices, ID conventions, connection modeling, ordering conventions, and level of detail. An existing architecture YAML reference, including a .yml, .yaml, or YAML-formatted .txt file, is an example of how to represent the diagram; it is not authoritative for content scope. Do not copy its limited topology or stop at one example bus path. Add every source-supported board, element, port, and connection needed to represent the complete authoritative target figure.
+The other attached files ({references}) are authoring and representation references. The Markdown authoring guide is normative for the YAML schema, field choices, ID conventions, connection modeling, and ordering conventions.
+
+The paired files references/reviewed_example/reference.pdf and references/reviewed_example/I2C_architecure.yml are a human-reviewed worked example. The YAML intentionally models only the SMB C[10] path from its paired PDF. Inspect the pair together to learn how visible PDF regions map to boards, how components map to elements and ports, and how each physical or logical hop maps to a connection. Use spatial enclosure, region labels, and connector boundaries to determine board ownership; do not assign an endpoint to a board merely because its bus path connects into that board.
+
+The reviewed pair is authoritative only for representation technique, not for the current architecture's content, IDs, labels, component count, path count, or topology scope. An existing architecture YAML reference is not authoritative for content scope. Do not copy its limited topology or hardware facts, do not stop at SMB C[10] or one example bus path, and do not omit regions or branches just because the reviewed YAML omits paths outside its deliberately limited scope. The current target figure remains the sole authority for what to include. Add every source-supported board, element, port, and connection needed to represent the complete authoritative target figure.
 
 Mandatory command-line agent workflow before the final response:
 1. Inspect the workspace files and use `{python_executable}` with PyMuPDF to extract the PDF text layer, page dimensions, figure captions, and visible labels. Do not rely on a whole-page thumbnail alone.
@@ -547,6 +568,7 @@ async def generate_architecture_yaml(
     process_callback: ProcessCallback | None = None,
 ) -> tuple[str, dict[str, Any]]:
     selected_references = select_reference_files(reference_files)
+    example_files = reviewed_example_files()
     with TemporaryDirectory(
         prefix="copilot-pdf-yaml-",
         dir=source_pdf.parent,
@@ -559,6 +581,12 @@ async def generate_architecture_yaml(
         workspace_references: list[Path] = []
         for reference in selected_references:
             copied_reference = reference_directory / reference.name
+            shutil.copy2(reference, copied_reference)
+            workspace_references.append(copied_reference)
+        reviewed_example_directory = reference_directory / "reviewed_example"
+        reviewed_example_directory.mkdir()
+        for reference in example_files:
+            copied_reference = reviewed_example_directory / reference.name
             shutil.copy2(reference, copied_reference)
             workspace_references.append(copied_reference)
 
@@ -600,11 +628,10 @@ async def _generate_architecture_yaml_in_workspace(
         selection = extract_architecture_pages(source_pdf, filtered_pdf)
     except ArchitectureFigureNotFoundError as exc:
         raise YamlGenerationError(str(exc)) from exc
-    selected_references = select_reference_files(reference_files)
-    attachments = [filtered_pdf, *selected_references]
+    attachments = [filtered_pdf, *reference_files]
     prompt = build_generation_prompt(
         filtered_pdf.name,
-        [path.name for path in selected_references],
+        [path.relative_to(workspace).as_posix() for path in reference_files],
         selection,
         python_executable=sys.executable,
     )
