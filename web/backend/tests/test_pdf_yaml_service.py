@@ -486,7 +486,16 @@ class PdfYamlPatchTests(unittest.TestCase):
 
 class PdfYamlApiTests(unittest.TestCase):
     def test_generate_stream_reports_progress_and_result(self) -> None:
-        async def fake_generate(source: Path, references: list[Path], progress_callback=None, activity_callback=None, process_callback=None):
+        async def fake_generate(
+            source: Path,
+            references: list[Path],
+            progress_callback=None,
+            activity_callback=None,
+            process_callback=None,
+            process_delta_callback=None,
+            output_delta_callback=None,
+            copilot_activity_callback=None,
+        ):
             self.assertTrue(source.is_file())
             if progress_callback is not None:
                 await progress_callback("generating", 25)
@@ -494,6 +503,12 @@ class PdfYamlApiTests(unittest.TestCase):
                 await activity_callback("analyzing")
             if process_callback is not None:
                 await process_callback("Tracing board connections.")
+            if process_delta_callback is not None:
+                await process_delta_callback("Inspecting the DC-SCI connector pinout.")
+            if copilot_activity_callback is not None:
+                await copilot_activity_callback("Started tool: view")
+            if output_delta_callback is not None:
+                await output_delta_callback("version: 1\n")
             if progress_callback is not None:
                 await progress_callback("validating", 65)
                 await progress_callback("completed", 100)
@@ -524,6 +539,18 @@ class PdfYamlApiTests(unittest.TestCase):
             ["Tracing board connections."],
             [event["message"] for event in events if event["type"] == "process"],
         )
+        self.assertEqual(
+            ["Inspecting the DC-SCI connector pinout."],
+            [event["content"] for event in events if event["type"] == "process_delta"],
+        )
+        self.assertEqual(
+            ["Started tool: view"],
+            [event["message"] for event in events if event["type"] == "copilot_activity"],
+        )
+        self.assertEqual(
+            ["version: 1\n"],
+            [event["content"] for event in events if event["type"] == "output_delta"],
+        )
         self.assertEqual("result", events[-1]["type"])
         self.assertEqual("source.yml", events[-1]["file_name"])
 
@@ -546,8 +573,8 @@ class PdfYamlApiTests(unittest.TestCase):
 
         self.assertEqual(200, response.status_code)
         self.assertEqual("Acme", response.headers["x-architecture-product"])
-        self.assertEqual("1,2", response.headers["x-architecture-pages"])
-        self.assertEqual(2, page_count)
+        self.assertEqual("2", response.headers["x-architecture-pages"])
+        self.assertEqual(1, page_count)
 
     def test_prepare_rejects_pdf_without_architecture_figure(self) -> None:
         document = pymupdf.open()

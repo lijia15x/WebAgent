@@ -219,7 +219,10 @@ const translations = {
     copilotWaiting: "等待开始",
     viewCopilotHistory: "查看全部记录",
     copilotHistoryTitle: "Copilot 运行记录",
-    copilotHistoryHint: "当前转换中可见的状态与过程消息",
+    copilotHistoryHint: "当前转换中 Copilot SDK 返回的过程、工具和输出消息",
+    copilotHistoryProcess: "过程",
+    copilotHistoryOutput: "输出",
+    copilotHistoryTool: "工具",
     activityContextReady: "已提交精简架构图和参考文件",
     activityAnalyzing: "Copilot 正在分析板卡、器件和连接",
     activityInspectingInputs: "Copilot 正在检查输入内容",
@@ -470,7 +473,10 @@ const translations = {
     copilotWaiting: "Waiting to start",
     viewCopilotHistory: "View full history",
     copilotHistoryTitle: "Copilot activity history",
-    copilotHistoryHint: "Visible status and process messages from the current conversion",
+    copilotHistoryHint: "Process, tool, and output messages returned by Copilot SDK for this conversion",
+    copilotHistoryProcess: "Process",
+    copilotHistoryOutput: "Output",
+    copilotHistoryTool: "Tool",
     activityContextReady: "Reduced architecture and references submitted",
     activityAnalyzing: "Copilot is analyzing boards, elements, and connections",
     activityInspectingInputs: "Copilot is inspecting the input",
@@ -960,6 +966,9 @@ let generatedFileName = "architecture.yml";
 let generationStartedAt;
 let generationTimerId;
 let copilotHistory = [];
+let copilotHistoryCurrentType;
+let copilotHistoryCurrentText;
+let copilotHistoryScrollFrame;
 
 const copilotActivityKeys = {
   context_ready: "activityContextReady",
@@ -972,6 +981,8 @@ const copilotActivityKeys = {
 
 function resetCopilotActivity() {
   copilotHistory = [];
+  copilotHistoryCurrentType = undefined;
+  copilotHistoryCurrentText = undefined;
   copilotHistoryList.replaceChildren();
   showCopilotHistoryButton.disabled = true;
   copilotActivityList.replaceChildren();
@@ -981,21 +992,62 @@ function resetCopilotActivity() {
   copilotActivityList.append(item);
 }
 
-function appendCopilotHistory(message, type) {
+function scheduleCopilotHistoryScroll() {
+  if (!copilotHistoryDialog.open || copilotHistoryScrollFrame) return;
+  copilotHistoryScrollFrame = window.requestAnimationFrame(() => {
+    copilotHistoryList.scrollTop = copilotHistoryList.scrollHeight;
+    copilotHistoryScrollFrame = undefined;
+  });
+}
+
+function createCopilotHistoryItem(type) {
   const elapsed = generationStartedAt === undefined
     ? "00:00"
     : formatElapsed(performance.now() - generationStartedAt);
-  copilotHistory.push({ elapsed, message, type });
+  const labels = {
+    process: t("copilotHistoryProcess"),
+    output: t("copilotHistoryOutput"),
+    tool: t("copilotHistoryTool"),
+  };
+  const entry = { elapsed, content: "", type };
+  copilotHistory.push(entry);
   const item = document.createElement("li");
-  item.className = type === "process" ? "is-process" : "is-activity";
+  item.className = `is-${type}`;
   const time = document.createElement("time");
   time.textContent = elapsed;
+  const body = document.createElement("div");
+  const kind = document.createElement("strong");
+  kind.textContent = labels[type];
   const text = document.createElement("span");
-  text.textContent = message;
-  item.append(time, text);
+  body.append(kind, text);
+  item.append(time, body);
   copilotHistoryList.append(item);
   showCopilotHistoryButton.disabled = false;
-  if (copilotHistoryDialog.open) item.scrollIntoView({ block: "nearest" });
+  scheduleCopilotHistoryScroll();
+  return { entry, text };
+}
+
+function appendCopilotHistoryDelta(content, type) {
+  const delta = String(content || "");
+  if (!delta) return;
+  if (copilotHistoryCurrentType !== type || !copilotHistoryCurrentText) {
+    const item = createCopilotHistoryItem(type);
+    copilotHistoryCurrentType = type;
+    copilotHistoryCurrentText = item;
+  }
+  copilotHistoryCurrentText.entry.content += delta;
+  copilotHistoryCurrentText.text.textContent += delta;
+  scheduleCopilotHistoryScroll();
+}
+
+function appendCopilotToolActivity(message) {
+  const text = String(message || "").trim();
+  if (!text) return;
+  copilotHistoryCurrentType = undefined;
+  copilotHistoryCurrentText = undefined;
+  const item = createCopilotHistoryItem("tool");
+  item.entry.content = text;
+  item.text.textContent = text;
 }
 
 function appendCopilotActivity(activity) {
@@ -1010,7 +1062,6 @@ function appendCopilotActivity(activity) {
   item.dataset.i18n = key;
   item.textContent = message;
   copilotActivityList.append(item);
-  appendCopilotHistory(message, "activity");
   while (copilotActivityList.children.length > 4) copilotActivityList.firstElementChild.remove();
 }
 
@@ -1024,7 +1075,6 @@ function appendCopilotProcess(message) {
   item.className = "is-process";
   item.textContent = text;
   copilotActivityList.append(item);
-  appendCopilotHistory(text, "process");
   while (copilotActivityList.children.length > 4) copilotActivityList.firstElementChild.remove();
 }
 
@@ -1117,6 +1167,9 @@ async function readGenerationStream(response) {
       if (event.type === "progress") updateGenerationProgress(event.stage, event.percent);
       if (event.type === "activity") appendCopilotActivity(event.activity);
       if (event.type === "process") appendCopilotProcess(event.message);
+      if (event.type === "process_delta") appendCopilotHistoryDelta(event.content, "process");
+      if (event.type === "output_delta") appendCopilotHistoryDelta(event.content, "output");
+      if (event.type === "copilot_activity") appendCopilotToolActivity(event.message);
       if (event.type === "error") throw new Error(event.detail || t("yamlGenerationFailed"));
       if (event.type === "result") result = event;
     }
@@ -1126,6 +1179,9 @@ async function readGenerationStream(response) {
     const event = JSON.parse(buffer);
     if (event.type === "activity") appendCopilotActivity(event.activity);
     if (event.type === "process") appendCopilotProcess(event.message);
+    if (event.type === "process_delta") appendCopilotHistoryDelta(event.content, "process");
+    if (event.type === "output_delta") appendCopilotHistoryDelta(event.content, "output");
+    if (event.type === "copilot_activity") appendCopilotToolActivity(event.message);
     if (event.type === "error") throw new Error(event.detail || t("yamlGenerationFailed"));
     if (event.type === "result") result = event;
   }

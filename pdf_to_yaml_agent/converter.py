@@ -26,6 +26,7 @@ ID_PATTERN = re.compile(r"^[a-z0-9_]+$")
 ProgressCallback = Callable[[str, int], Awaitable[None]]
 ActivityCallback = Callable[[str], Awaitable[None]]
 ProcessCallback = Callable[[str], Awaitable[None]]
+DeltaCallback = Callable[[str], Awaitable[None]]
 PDF_WORKSPACE_GUIDANCE = """Use the temporary request workspace actively. You may create analysis files and run read-only inspection commands inside it. Do not modify the source PDF or files under references. Do not access files outside this workspace. All analysis artifacts are temporary and must not be mentioned in the final response."""
 DEFAULT_GENERATION_TIMEOUT_SECONDS = 900.0
 DEFAULT_REPAIR_TIMEOUT_SECONDS = 300.0
@@ -566,6 +567,9 @@ async def generate_architecture_yaml(
     progress_callback: ProgressCallback | None = None,
     activity_callback: ActivityCallback | None = None,
     process_callback: ProcessCallback | None = None,
+    process_delta_callback: DeltaCallback | None = None,
+    output_delta_callback: DeltaCallback | None = None,
+    copilot_activity_callback: ActivityCallback | None = None,
 ) -> tuple[str, dict[str, Any]]:
     selected_references = select_reference_files(reference_files)
     example_files = reviewed_example_files()
@@ -598,6 +602,9 @@ async def generate_architecture_yaml(
             progress_callback=progress_callback,
             activity_callback=activity_callback,
             process_callback=process_callback,
+            process_delta_callback=process_delta_callback,
+            output_delta_callback=output_delta_callback,
+            copilot_activity_callback=copilot_activity_callback,
         )
 
 
@@ -609,6 +616,9 @@ async def _generate_architecture_yaml_in_workspace(
     progress_callback: ProgressCallback | None = None,
     activity_callback: ActivityCallback | None = None,
     process_callback: ProcessCallback | None = None,
+    process_delta_callback: DeltaCallback | None = None,
+    output_delta_callback: DeltaCallback | None = None,
+    copilot_activity_callback: ActivityCallback | None = None,
 ) -> tuple[str, dict[str, Any]]:
     async def report(stage: str, percent: int) -> None:
         if progress_callback is not None:
@@ -621,6 +631,18 @@ async def _generate_architecture_yaml_in_workspace(
     async def report_process(message: str) -> None:
         if process_callback is not None:
             await process_callback(message)
+
+    async def report_process_delta(delta: str) -> None:
+        if process_delta_callback is not None:
+            await process_delta_callback(delta)
+
+    async def report_output_delta(delta: str) -> None:
+        if output_delta_callback is not None:
+            await output_delta_callback(delta)
+
+    async def report_copilot_activity(message: str) -> None:
+        if copilot_activity_callback is not None:
+            await copilot_activity_callback(message)
 
     await report("filtering", 10)
     filtered_pdf = source_pdf.with_name(f"{source_pdf.stem}_smbus_figures.pdf")
@@ -660,6 +682,7 @@ async def _generate_architecture_yaml_in_workspace(
     def report_process_activity(delta: str) -> None:
         nonlocal process_buffer, last_process_message
         report_generation_activity("analyzing")
+        asyncio.get_running_loop().create_task(report_process_delta(delta))
         process_buffer += delta
         while True:
             boundary = re.search(r"(?:[.!?。！？](?:\s|$)|\n)", process_buffer)
@@ -673,11 +696,13 @@ async def _generate_architecture_yaml_in_workspace(
             last_process_message = message
             asyncio.get_running_loop().create_task(report_process(message))
 
-    def report_output_activity(_: str) -> None:
+    def report_output_activity(delta: str) -> None:
         report_generation_activity("writing_yaml")
+        asyncio.get_running_loop().create_task(report_output_delta(delta))
 
-    def report_tool_activity(_: str) -> None:
+    def report_tool_activity(message: str) -> None:
         report_generation_activity("inspecting_inputs")
+        asyncio.get_running_loop().create_task(report_copilot_activity(message))
 
     content = await ask_copilot(
         prompt,
@@ -727,6 +752,9 @@ async def _generate_architecture_yaml_in_workspace(
             "PDF_YAML_REPAIR_TIMEOUT_SECONDS",
             DEFAULT_REPAIR_TIMEOUT_SECONDS,
         ),
+        on_delta=report_output_activity,
+        on_process_delta=report_process_activity,
+        on_activity=report_tool_activity,
     )
     await report("revalidating", 95)
     repaired_document = apply_repair_patch(original_document, patch_content)

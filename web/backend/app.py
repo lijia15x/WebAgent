@@ -312,6 +312,15 @@ async def generate_pdf_yaml_stream(pdf: UploadFile = File(...)) -> StreamingResp
         async def report_process(message: str) -> None:
             await events.put({"type": "process", "message": message})
 
+        async def report_process_delta(content: str) -> None:
+            await events.put({"type": "process_delta", "content": content})
+
+        async def report_output_delta(content: str) -> None:
+            await events.put({"type": "output_delta", "content": content})
+
+        async def report_copilot_activity(message: str) -> None:
+            await events.put({"type": "copilot_activity", "message": message})
+
         async def run_generation() -> None:
             try:
                 await report_progress("starting", 5)
@@ -321,6 +330,9 @@ async def generate_pdf_yaml_stream(pdf: UploadFile = File(...)) -> StreamingResp
                     progress_callback=report_progress,
                     activity_callback=report_activity,
                     process_callback=report_process,
+                    process_delta_callback=report_process_delta,
+                    output_delta_callback=report_output_delta,
+                    copilot_activity_callback=report_copilot_activity,
                 )
                 await events.put(
                     {
