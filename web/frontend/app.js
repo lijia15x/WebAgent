@@ -522,6 +522,8 @@ const conversation = document.querySelector("#conversation");
 const input = document.querySelector("#messageInput");
 const sendButton = document.querySelector("#sendButton");
 const toast = document.querySelector("#toast");
+const toastMessage = document.querySelector("#toastMessage");
+const closeToastButton = document.querySelector("#closeToast");
 const activityList = document.querySelector("#activityList");
 const activityStatus = document.querySelector("#activityStatus");
 const languageToggle = document.querySelector("#languageToggle");
@@ -588,12 +590,22 @@ function applyTranslations() {
   document.querySelector("#agentStatus").textContent = isRunning ? t("running") : t("ready");
 }
 
-function showToast(message) {
-  toast.textContent = message;
+function hideToast() {
+  clearTimeout(toastTimer);
+  toast.classList.remove("is-visible", "is-error", "is-persistent");
+}
+
+function showToast(message, { error = false, persistent = false } = {}) {
+  toastMessage.textContent = message;
+  toast.classList.toggle("is-error", error);
+  toast.classList.toggle("is-persistent", persistent);
+  closeToastButton.classList.toggle("is-hidden", !persistent);
   toast.classList.add("is-visible");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove("is-visible"), 5000);
+  if (!persistent) toastTimer = setTimeout(hideToast, 5000);
 }
+
+closeToastButton.addEventListener("click", hideToast);
 
 function updateAutomationControls() {
   const toggle = document.querySelector("#automationToggle");
@@ -1480,7 +1492,10 @@ async function generateYaml() {
     renderGeneratedYaml(payload);
   } catch (error) {
     updateGenerationProgress("failed", Number.parseInt(generationPercent.textContent, 10) || 0);
-    showToast(error.message || t("yamlGenerationFailed"));
+    showToast(error.message || t("yamlGenerationFailed"), {
+      error: true,
+      persistent: true,
+    });
   } finally {
     stopGenerationTimer();
     copilotActivityDot.classList.remove("is-running");

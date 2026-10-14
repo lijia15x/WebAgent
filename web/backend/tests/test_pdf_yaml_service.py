@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -84,6 +85,7 @@ class PdfYamlServiceTests(unittest.TestCase):
         self.assertIn("Do not copy its limited topology", prompt)
         self.assertIn("Do not broaden the result beyond the authoritative target", prompt)
         self.assertIn("Do not invent", prompt)
+        self.assertIn("Do not use !include or any other custom YAML tags", prompt)
         self.assertIn("Mandatory command-line agent workflow", prompt)
         self.assertIn("source_inventory.json", prompt)
         self.assertIn("high-resolution full image plus overlapping 3x-5x crops", prompt)
@@ -354,7 +356,13 @@ class PdfYamlGenerationTests(unittest.IsolatedAsyncioTestCase):
             with patch(
                 "pdf_to_yaml_agent.converter.ask_copilot",
                 new=AsyncMock(side_effect=fake_ask),
-            ) as ask:
+            ) as ask, patch.dict(
+                os.environ,
+                {
+                    "PDF_YAML_GENERATION_TIMEOUT_SECONDS": "1800",
+                    "PDF_YAML_REPAIR_TIMEOUT_SECONDS": "300",
+                },
+            ):
                 content, validation = await generate_architecture_yaml(
                     source,
                     [guide],

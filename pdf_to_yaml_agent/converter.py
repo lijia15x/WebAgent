@@ -112,6 +112,7 @@ Mandatory command-line agent workflow before the final response:
 
 Output requirements:
 - Return YAML only. Do not use Markdown fences, prose, JSON, or an explanation.
+- Return one self-contained YAML document. Do not use !include or any other custom YAML tags, external references, or file fragments.
 - Use exactly these top-level keys in this order: version, boards, elements, connections.
 - Set version to 1.
 - Include all board and module boundaries, SMBus/I2C/I3C controllers, hubs, muxes, buffers, translators, connectors, cables, and endpoint devices visibly represented in the target figure.
@@ -733,7 +734,8 @@ async def _generate_architecture_yaml_in_workspace(
         original_document = yaml.safe_load(candidate)
     except yaml.YAMLError as exc:
         raise YamlGenerationError(
-            "Copilot returned invalid YAML syntax that cannot be safely patched; regenerate the YAML"
+            "Copilot returned invalid YAML syntax that cannot be safely patched; "
+            f"regenerate the YAML: {exc}"
         ) from exc
     if not isinstance(original_document, dict):
         raise YamlGenerationError(
