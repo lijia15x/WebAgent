@@ -19,6 +19,7 @@ from pdf_to_yaml_agent.pdf_filter import (
     ArchitectureSelection,
     extract_architecture_pages,
 )
+from pdf_to_yaml_agent.yaml_formatter import format_architecture_yaml
 
 
 ALLOWED_TOP_LEVEL_KEYS = {"version", "boards", "elements", "connections"}
@@ -727,6 +728,7 @@ async def _generate_architecture_yaml_in_workspace(
     candidate = strip_yaml_fence(content)
     validation = validate_architecture_yaml(candidate)
     if validation["valid"]:
+        candidate = format_architecture_yaml(candidate)
         await report("completed", 100)
         return candidate, validation
 
@@ -768,5 +770,6 @@ async def _generate_architecture_yaml_in_workspace(
             "Copilot returned non-compliant YAML after one repair attempt: "
             + "; ".join(validation["errors"][:5])
         )
+    candidate = format_architecture_yaml(candidate)
     await report("completed", 100)
     return candidate, validation

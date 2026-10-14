@@ -20,6 +20,7 @@ from pdf_to_yaml_agent.converter import (
     validate_architecture_yaml,
 )
 from pdf_to_yaml_agent.pdf_filter import extract_architecture_pages
+from pdf_to_yaml_agent.yaml_formatter import format_architecture_yaml
 from pdf_to_yaml_agent import reference_store
 from web.backend.app import app
 
@@ -59,6 +60,31 @@ def write_architecture_pdf(path: Path) -> None:
 
 
 class PdfYamlServiceTests(unittest.TestCase):
+    def test_formats_flow_yaml_with_indentation_and_section_spacing(self) -> None:
+        flow_yaml = (
+            "version: 1\n"
+            "boards: [{id: board_a, label: Board A}]\n"
+            "elements: [{id: controller_a, board: board_a, type: controller, "
+            "ports: [{id: bus, direction: bidirectional}]}]\n"
+            "connections: []\n"
+        )
+
+        formatted = format_architecture_yaml(flow_yaml)
+
+        self.assertEqual(yaml.safe_load(flow_yaml), yaml.safe_load(formatted))
+        self.assertNotIn("{", formatted)
+        self.assertIn("\n\nboards:\n  - id: board_a\n    label: Board A", formatted)
+        self.assertIn(
+            "\n\nelements:\n  - id: controller_a\n"
+            "    board: board_a\n"
+            "    type: controller\n"
+            "    ports:\n"
+            "      - id: bus\n"
+            "        direction: bidirectional",
+            formatted,
+        )
+        self.assertIn("\n\nconnections: []", formatted)
+
     def test_reference_selection_prefers_markdown_over_same_name_pdf(self) -> None:
         selected = select_reference_files(
             [Path("guide.pdf"), Path("example.yml"), Path("guide.md")]
