@@ -13,7 +13,11 @@ from typing import Any, Awaitable, Callable, Sequence
 
 import yaml
 
-from common.skills.copilot_sdk.copilot_sdk_client import ask_copilot
+from common.skills.copilot_sdk.copilot_sdk_client import (
+    ContextTier,
+    ReasoningEffort,
+    ask_copilot,
+)
 from pdf_to_yaml_agent.pdf_filter import (
     ArchitectureFigureNotFoundError,
     ArchitectureSelection,
@@ -31,6 +35,17 @@ DeltaCallback = Callable[[str], Awaitable[None]]
 PDF_WORKSPACE_GUIDANCE = """Use the temporary request workspace actively. You may create analysis files and run read-only inspection commands inside it. Do not modify the source PDF or files under references. Do not access files outside this workspace. All analysis artifacts are temporary and must not be mentioned in the final response."""
 DEFAULT_GENERATION_TIMEOUT_SECONDS = 1800.0
 DEFAULT_REPAIR_TIMEOUT_SECONDS = 300.0
+REASONING_EFFORT_OPTIONS: dict[str, ReasoningEffort] = {
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "xhigh": "xhigh",
+    "max": "max",
+}
+CONTEXT_TIER_OPTIONS: dict[str, ContextTier] = {
+    "default": "default",
+    "long_context": "long_context",
+}
 REVIEWED_EXAMPLE_DIRECTORY = Path(__file__).resolve().parent / "reference"
 REVIEWED_EXAMPLE_PDF = REVIEWED_EXAMPLE_DIRECTORY / "reference.pdf"
 REVIEWED_EXAMPLE_YAML = REVIEWED_EXAMPLE_DIRECTORY / "I2C_architecure.yml"
@@ -75,6 +90,23 @@ def timeout_from_env(name: str, default: float) -> float:
     if timeout <= 0:
         raise YamlGenerationError(f"{name} must be greater than zero")
     return timeout
+
+
+def pdf_yaml_session_settings() -> tuple[ReasoningEffort | None, ContextTier | None]:
+    effort = os.getenv("PDF_YAML_REASONING_EFFORT")
+    tier = os.getenv("PDF_YAML_CONTEXT_TIER")
+    if effort is not None and effort not in REASONING_EFFORT_OPTIONS:
+        raise YamlGenerationError(
+            "PDF_YAML_REASONING_EFFORT must be one of: low, medium, high, xhigh, max"
+        )
+    if tier is not None and tier not in CONTEXT_TIER_OPTIONS:
+        raise YamlGenerationError(
+            "PDF_YAML_CONTEXT_TIER must be default or long_context"
+        )
+    return (
+        REASONING_EFFORT_OPTIONS.get(effort) if effort is not None else None,
+        CONTEXT_TIER_OPTIONS.get(tier) if tier is not None else None,
+    )
 
 
 def build_generation_prompt(
@@ -622,6 +654,8 @@ async def _generate_architecture_yaml_in_workspace(
     output_delta_callback: DeltaCallback | None = None,
     copilot_activity_callback: ActivityCallback | None = None,
 ) -> tuple[str, dict[str, Any]]:
+    reasoning_effort, context_tier = pdf_yaml_session_settings()
+
     async def report(stage: str, percent: int) -> None:
         if progress_callback is not None:
             await progress_callback(stage, percent)
@@ -709,6 +743,8 @@ async def _generate_architecture_yaml_in_workspace(
     content = await ask_copilot(
         prompt,
         model=model or os.getenv("PDF_YAML_MODEL", "gpt-5.4-mini"),
+        reasoning_effort=reasoning_effort,
+        context_tier=context_tier,
         files=attachments,
         workspace=workspace,
         workspace_guidance=PDF_WORKSPACE_GUIDANCE,
@@ -749,6 +785,8 @@ async def _generate_architecture_yaml_in_workspace(
     patch_content = await ask_copilot(
         build_repair_prompt(candidate, validation["errors"]),
         model=model or os.getenv("PDF_YAML_MODEL", "gpt-5.4-mini"),
+        reasoning_effort=reasoning_effort,
+        context_tier=context_tier,
         files=[],
         workspace=workspace,
         workspace_guidance=PDF_WORKSPACE_GUIDANCE,

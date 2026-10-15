@@ -11,10 +11,12 @@ import yaml
 from fastapi.testclient import TestClient
 
 from pdf_to_yaml_agent.converter import (
+    YamlGenerationError,
     apply_repair_patch,
     build_generation_prompt,
     ensure_scope_preserved,
     generate_architecture_yaml,
+    pdf_yaml_session_settings,
     select_reference_files,
     strip_yaml_fence,
     validate_architecture_yaml,
@@ -60,6 +62,30 @@ def write_architecture_pdf(path: Path) -> None:
 
 
 class PdfYamlServiceTests(unittest.TestCase):
+    def test_pdf_yaml_session_settings_validate_configured_values(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "PDF_YAML_REASONING_EFFORT": "high",
+                "PDF_YAML_CONTEXT_TIER": "long_context",
+            },
+        ):
+            self.assertEqual(("high", "long_context"), pdf_yaml_session_settings())
+
+        for key, value in (
+            ("PDF_YAML_REASONING_EFFORT", "unsupported"),
+            ("PDF_YAML_CONTEXT_TIER", "65536"),
+        ):
+            with self.subTest(key=key), patch.dict(os.environ, {key: value}):
+                with self.assertRaisesRegex(YamlGenerationError, key):
+                    pdf_yaml_session_settings()
+
+    def test_pdf_yaml_session_settings_unset_use_sdk_defaults(self) -> None:
+        with patch.dict(os.environ):
+            os.environ.pop("PDF_YAML_REASONING_EFFORT", None)
+            os.environ.pop("PDF_YAML_CONTEXT_TIER", None)
+            self.assertEqual((None, None), pdf_yaml_session_settings())
+
     def test_formats_flow_yaml_with_indentation_and_section_spacing(self) -> None:
         flow_yaml = (
             "version: 1\n"
@@ -387,6 +413,8 @@ class PdfYamlGenerationTests(unittest.IsolatedAsyncioTestCase):
                 {
                     "PDF_YAML_GENERATION_TIMEOUT_SECONDS": "1800",
                     "PDF_YAML_REPAIR_TIMEOUT_SECONDS": "300",
+                    "PDF_YAML_REASONING_EFFORT": "high",
+                    "PDF_YAML_CONTEXT_TIER": "long_context",
                 },
             ):
                 content, validation = await generate_architecture_yaml(
@@ -423,6 +451,9 @@ class PdfYamlGenerationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([], second_files)
         self.assertEqual(1800.0, ask.await_args_list[0].kwargs["timeout"])
         self.assertEqual(300.0, ask.await_args_list[1].kwargs["timeout"])
+        for call in ask.await_args_list:
+            self.assertEqual("high", call.kwargs["reasoning_effort"])
+            self.assertEqual("long_context", call.kwargs["context_tier"])
         self.assertIn("minimal RFC 6902-style JSON patch", repair_prompt)
         self.assertIn("Never remove boards, elements, ports, or connections", repair_prompt)
         self.assertIn("_smbus_figures.pdf", first_files[0].name)

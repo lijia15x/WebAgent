@@ -3,7 +3,11 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Callable, Optional, Sequence, Union
+from typing import Callable, Literal, Optional, Sequence, Union
+
+
+ReasoningEffort = Literal["low", "medium", "high", "xhigh", "max"]
+ContextTier = Literal["default", "long_context"]
 
 
 PROCESS_PHASES = frozenset({"analysis", "reasoning"})
@@ -63,6 +67,8 @@ async def ask_copilot(
     on_delta: Optional[Callable[[str], None]] = None,
     on_process_delta: Optional[Callable[[str], None]] = None,
     on_activity: Optional[Callable[[str], None]] = None,
+    reasoning_effort: ReasoningEffort | None = None,
+    context_tier: ContextTier | None = None,
 ) -> str:
     try:
         copilot_module = importlib.import_module("copilot")
@@ -121,6 +127,8 @@ async def ask_copilot(
         session = await client.create_session(
             on_permission_request=session_module.PermissionHandler.approve_all,
             model=model,
+            reasoning_effort=reasoning_effort,
+            context_tier=context_tier,
             streaming=on_delta is not None,
             working_directory=working_directory,
         )
