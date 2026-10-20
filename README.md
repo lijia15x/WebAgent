@@ -74,6 +74,33 @@ the MRC page. Each weekly Excel workbook produces its own PPT.
 Configure the AI model with `MRC_PPT_MODEL` in `.env` when the default is not
 suitable; the project uses its bundled MRC PowerPoint template.
 
+MRC PPT calls also accept `MRC_PPT_REASONING_EFFORT` (default `high`; choices:
+`low`, `medium`, `high`, `xhigh`, `max`) and `MRC_PPT_CONTEXT_TIER` (default
+`default`; choices: `default`, `long_context`). The latter selects a context
+tier, not a numeric token limit. Both settings apply to slides 2 and 3 for all
+MRC templates. Empty values use the defaults; invalid values fail configuration
+validation. Model support for each tier depends on the Copilot service.
+Restart the backend after changing environment settings.
+
+Workbooks whose filenames contain `DMR-16ch` (case-insensitive) use the dedicated
+pre-read dashboard template and prompts. Slide 2 contains Highlights, grouped
+engineering updates, up to five sourced milestones, per-item **Details** links,
+and a full-workbook link. Targets, forecasts, actual dates and worst-case dates
+remain distinct; absent dates display `Not provided`. Slide 3 provides concise
+supporting detail without padding each group to a fixed number of paragraphs.
+Other workbooks retain their existing prompts and template behavior.
+
+DMR-16ch generation validates that cited cells exist and are nonblank, that each
+milestone date occurs in its cited cell, and that content stays within the
+dashboard's item and text limits. Date matching tolerates equivalent quote,
+spacing and dash styles, but does not infer years or substitute different dates.
+When content validation fails, only the failing slide is regenerated with the
+specific validation error, for at most three attempts. Persistent failures stop
+generation rather than silently dropping content or retaining template placeholders. These checks
+do not replace a factual review of the model's narrative or date classification.
+Links use the downloaded artifact's source URL, never a model-provided URL; when
+no source URL is available, no clickable links are fabricated.
+
 `Enable Automation` currently persists the setting and disables manual MRC
 controls; it does not start a scheduler. A future scheduler should use the
 configured `mrc_automation_settings.timezone` and apply these rules:

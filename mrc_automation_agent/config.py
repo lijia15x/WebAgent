@@ -1,8 +1,11 @@
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast, get_args
 
 from dotenv import load_dotenv
+
+from common.skills.copilot_sdk.copilot_sdk_client import ContextTier, ReasoningEffort
 
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
@@ -27,6 +30,16 @@ class MrcConfig:
     smtp_port: int = 587
     header_search_rows: int = 10
     ppt_model: str = "gpt-5.6-sol"
+    ppt_reasoning_effort: ReasoningEffort = "high"
+    ppt_context_tier: ContextTier = "default"
+
+    def __post_init__(self) -> None:
+        for name, value, choices in (
+            ("MRC_PPT_REASONING_EFFORT", self.ppt_reasoning_effort, get_args(ReasoningEffort)),
+            ("MRC_PPT_CONTEXT_TIER", self.ppt_context_tier, get_args(ContextTier)),
+        ):
+            if value not in choices:
+                raise ConfigurationError(f"{name} must be one of: {', '.join(choices)}")
 
     @classmethod
     def from_env(cls) -> "MrcConfig":
@@ -46,6 +59,14 @@ class MrcConfig:
             smtp_port=int(os.getenv("MRC_SMTP_PORT", "587")),
             header_search_rows=int(os.getenv("MRC_HEADER_SEARCH_ROWS", "10")),
             ppt_model=os.getenv("MRC_PPT_MODEL", "gpt-5.6-sol"),
+            ppt_reasoning_effort=cast(
+                ReasoningEffort,
+                os.getenv("MRC_PPT_REASONING_EFFORT", "high").strip().lower() or "high",
+            ),
+            ppt_context_tier=cast(
+                ContextTier,
+                os.getenv("MRC_PPT_CONTEXT_TIER", "default").strip().lower() or "default",
+            ),
         )
 
     def require_sharepoint(self) -> None:
