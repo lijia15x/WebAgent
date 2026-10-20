@@ -21,6 +21,14 @@ class PptGeneratorTests(unittest.TestCase):
             ppt_generator._template_path_for("dmr-rs dashboard.XLSX"),
         )
         self.assertEqual(
+            ppt_generator.DMR_16CH_TEMPLATE_PATH,
+            ppt_generator._template_path_for("DMR-16ch Status Dashboard WW43'26.xlsx"),
+        )
+        self.assertEqual(
+            ppt_generator.DMR_16CH_TEMPLATE_PATH,
+            ppt_generator._template_path_for("dmr-16CH dashboard.XLSX"),
+        )
+        self.assertEqual(
             ppt_generator.DEFAULT_TEMPLATE_PATH,
             ppt_generator._template_path_for("Other Dashboard.xlsx"),
         )
@@ -39,6 +47,30 @@ class PptGeneratorTests(unittest.TestCase):
         self.assertIn("Platform is the engineering group", ppt_generator.PAGE2_PROMPT)
         self.assertIn("Engineering Domain is the project", ppt_generator.PAGE2_PROMPT)
         self.assertIn("Organize the narrative by Platform", ppt_generator.PAGE3_PROMPT)
+
+    def test_uses_dmr_16ch_template_preserving_cover_title(self) -> None:
+        template_path = ppt_generator._template_path_for(
+            "DMR-16ch Status Dashboard WW43'26.xlsx"
+        )
+        template = Presentation(str(template_path))
+        title = next(
+            shape for shape in ppt_generator._text_shapes(template.slides[0])
+            if "DMR-16ch" in shape.text
+        )
+        expected_font_size = ppt_generator._first_font_size(title)
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "output.pptx"
+            ppt_generator._update_presentation(
+                template_path, output, "2026WW43", {}, {}
+            )
+            presentation = Presentation(str(output))
+            shapes = ppt_generator._text_shapes(presentation.slides[0])
+            cover_title = next(shape for shape in shapes if "DMR-16ch" in shape.text)
+            cover_text = "\n".join(shape.text for shape in shapes)
+            self.assertEqual(expected_font_size, ppt_generator._first_font_size(cover_title))
+            self.assertIn("WW43'2026", cover_text)
+            self.assertIn("DHE Product Execution Forum", cover_text)
+            self.assertNotIn("OKS-AP", cover_text)
 
     def test_copilot_call_does_not_inherit_log_analysis_workspace(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -32,6 +32,9 @@ DEFAULT_TEMPLATE_PATH = (
 DMR_RS_TEMPLATE_PATH = (
     Path(__file__).resolve().parent / "templates" / "DMR-RS_template.pptx"
 )
+DMR_16CH_TEMPLATE_PATH = (
+    Path(__file__).resolve().parent / "templates" / "DMR-16ch_template.pptx"
+)
 TEMPLATE_PATH = DEFAULT_TEMPLATE_PATH
 
 PAGE2_PROMPT = """You are preparing slide 2 of an executive summary PPT from the attached Excel workbook.
@@ -165,6 +168,8 @@ def _sheet_names(excel_path: Path) -> list[str]:
 def _template_path_for(file_name: str) -> Path:
     if "dmr-rs" in file_name.casefold():
         return DMR_RS_TEMPLATE_PATH
+    if "dmr-16ch" in file_name.casefold():
+        return DMR_16CH_TEMPLATE_PATH
     return DEFAULT_TEMPLATE_PATH
 
 
